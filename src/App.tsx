@@ -1340,7 +1340,8 @@ export default function App() {
                       {gal.images.map((img, imgIdx: number) => (
                         <div
                           key={img.id}
-                          className={`reveal-scale relative group rounded-xl overflow-hidden bg-slate-100 aspect-square shadow-sm border border-slate-200 cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 delay-${Math.min(imgIdx * 100, 500)}`}
+                          className="gallery-img-enter relative group rounded-xl overflow-hidden bg-slate-100 aspect-square shadow-sm border border-slate-200 cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+                          style={{ animationDelay: `${Math.min(imgIdx * 60, 400)}ms` }}
                         >
                           <img 
                             src={img.url} 
