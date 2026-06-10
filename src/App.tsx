@@ -236,6 +236,21 @@ export default function App() {
     }
   }, [popup.enabled]);
 
+  // Reveal admin panel only when URL hash is #admin
+  useEffect(() => {
+    const checkHash = () => {
+      if (window.location.hash === '#admin') {
+        setIsAdminMode(true);
+        setTimeout(() => {
+          document.getElementById('admin-panel')?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+      }
+    };
+    checkHash();
+    window.addEventListener('hashchange', checkHash);
+    return () => window.removeEventListener('hashchange', checkHash);
+  }, []);
+
   // Scroll to section helper
   const scrollToSection = (id) => {
     setActiveTab(id);
@@ -261,6 +276,8 @@ export default function App() {
     setAdminAuthenticated(false);
     setAdminPassword("");
     setIsAdminMode(false);
+    history.replaceState(null, '', window.location.pathname);
+    scrollToSection('home');
   };
 
   // Popup configuration updates
@@ -463,13 +480,6 @@ export default function App() {
               View Full Announcement
             </button>
           )}
-          <button 
-            onClick={() => { setIsAdminMode(true); scrollToSection("admin-panel"); }}
-            className="flex items-center space-x-1 text-slate-300 hover:text-white bg-neutral-900 px-2.5 py-1 rounded border border-neutral-800 transition-all text-[11px]"
-          >
-            <Lock className="w-3 text-red-500" />
-            <span>{adminAuthenticated ? "Admin Dashboard" : "Admin Panel"}</span>
-          </button>
         </div>
       </div>
 
@@ -1438,7 +1448,8 @@ export default function App() {
         </div>
       </section>
 
-      {/* --- ADMIN PANEL CONTROLLER SECTION --- */}
+      {/* --- ADMIN PANEL CONTROLLER SECTION (only rendered when isAdminMode=true via #admin URL) --- */}
+      {isAdminMode &&
       <section id="admin-panel" className="py-20 bg-neutral-900 text-slate-100 border-t-8 border-red-600">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
@@ -1603,7 +1614,53 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Row 2: Add / Edit Event Panel */}
+              {/* Row 2: Manage / Delete Existing Events */}
+              <div className="bg-neutral-950 p-6 rounded-2xl border border-neutral-800 space-y-4">
+                <div>
+                  <h4 className="text-lg font-bold text-white flex items-center">
+                    <Calendar className="w-5 h-5 mr-2 text-red-500" />
+                    Manage Existing Events
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-1">Edit or remove events from the community calendar.</p>
+                </div>
+                {events.length === 0 ? (
+                  <p className="text-slate-500 text-xs italic">No events on the calendar yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {events.map((evt: { id: string; title: string; date: string; location?: string }) => (
+                      <div key={evt.id} className="flex items-center justify-between bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-3 gap-3">
+                        <div className="min-w-0">
+                          <p className="text-white text-xs font-bold truncate">{evt.title}</p>
+                          <p className="text-slate-400 text-[11px] mt-0.5">
+                            {new Date(evt.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            {evt.location ? ` · ${evt.location}` : ''}
+                          </p>
+                        </div>
+                        <div className="flex items-center space-x-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleEditEventClick(evt)}
+                            className="p-2 bg-neutral-800 hover:bg-neutral-700 text-amber-400 rounded border border-neutral-700 transition-all"
+                            title="Edit"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteEvent(evt.id)}
+                            className="p-2 bg-red-600 hover:bg-red-700 text-white rounded transition-all"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Row 3: Add / Edit Event Panel */}
               <div className="bg-neutral-950 p-6 rounded-2xl border border-neutral-800">
                 <div className="mb-6">
                   <h4 className="text-lg font-bold text-white flex items-center">
@@ -1884,6 +1941,7 @@ export default function App() {
 
         </div>
       </section>
+      }
 
       {/* --- FOOTER --- */}
       <footer className="bg-neutral-950 text-slate-400 text-xs sm:text-sm mt-auto border-t border-neutral-900">
@@ -1951,17 +2009,24 @@ export default function App() {
           </div>
 
           <div className="md:col-span-2 space-y-3">
-            <h5 className="text-white font-extrabold uppercase tracking-widest text-[11px] text-red-500">Staff Control</h5>
-            <button 
-              onClick={() => { setIsAdminMode(true); scrollToSection("admin-panel"); }}
-              className="w-full text-center bg-neutral-900 hover:bg-neutral-800 text-slate-300 border border-neutral-850 py-2 rounded font-bold uppercase tracking-wider text-[10px] flex items-center justify-center space-x-1.5"
+            <h5 className="text-white font-extrabold uppercase tracking-widest text-[11px] text-red-500">Connect</h5>
+            <a
+              href="https://www.paypal.com/donate/?hosted_button_id=263KFG6V9F8HC"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full text-center bg-red-600 hover:bg-red-700 text-white py-2 rounded font-bold uppercase tracking-wider text-[10px] flex items-center justify-center space-x-1.5 transition-all"
             >
-              <Lock className="w-3.5 h-3.5 text-red-500" />
-              <span>Admin Key Lock</span>
-            </button>
-            <p className="text-[10px] text-slate-600 leading-normal font-light">
-              Authorization key required. Manage events list, alert notification bar, and photo streams live.
-            </p>
+              <Heart className="w-3.5 h-3.5" />
+              <span>Donate via PayPal</span>
+            </a>
+            <a
+              href="https://www.facebook.com/hampcoinc"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full text-center bg-neutral-900 hover:bg-neutral-800 text-slate-300 border border-neutral-800 py-2 rounded font-bold uppercase tracking-wider text-[10px] flex items-center justify-center space-x-1.5 transition-all"
+            >
+              <span>Follow on Facebook</span>
+            </a>
           </div>
 
         </div>
