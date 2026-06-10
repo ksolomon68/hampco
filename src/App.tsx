@@ -115,16 +115,14 @@ const DEFAULT_EVENTS = [
     description: "Wanda's Abounding Grace presents the Walk Around the Block for Autism — a 5K fun run and community festival hosted in partnership with HAMPCO, Inc. Join us in raising awareness and support for the autism community.",
     category: "Health & Nutrition"
   },
-  {
-    id: "e7",
-    title: "Financial Literacy Classes",
-    date: "2026-06-10",
-    endDate: "2026-08-12",
-    time: "Tuesdays at 5:30 PM",
-    location: "HAMPCO Office, 1116 Jackson Street, Monroe, LA",
-    description: "FREE 8-week financial literacy series open to the community. Topics include budgeting, credit & debt management, saving, investing, and protecting your future. In-person and virtual options available. Classes are free and open to the public. Register at www.hampcoinc.org.",
-    category: "Education & Skills"
-  }
+  { id: "fl_w1", title: "Financial Literacy – Week 1: Budgeting", date: "2026-06-10", endDate: "2026-06-10", time: "5:30 PM", location: "HAMPCO Office, 1116 Jackson Street, Monroe, LA", description: "Week 1 of 8 — Budgeting: Learn to make your money work for you. FREE class open to the public. In-person & virtual options available. Register at www.hampcoinc.org.", category: "Education & Skills" },
+  { id: "fl_w2", title: "Financial Literacy – Week 2: Credit & Debt", date: "2026-06-17", endDate: "2026-06-17", time: "5:30 PM", location: "HAMPCO Office, 1116 Jackson Street, Monroe, LA", description: "Week 2 of 8 — Credit & Debt: Understand credit and manage debt wisely. FREE class open to the public. In-person & virtual options available.", category: "Education & Skills" },
+  { id: "fl_w3", title: "Financial Literacy – Week 3: Saving", date: "2026-06-24", endDate: "2026-06-24", time: "5:30 PM", location: "HAMPCO Office, 1116 Jackson Street, Monroe, LA", description: "Week 3 of 8 — Saving: Build an emergency fund and plan for your goals. FREE class open to the public. In-person & virtual options available.", category: "Education & Skills" },
+  { id: "fl_w4", title: "Financial Literacy – Week 4: Investing", date: "2026-07-01", endDate: "2026-07-01", time: "5:30 PM", location: "HAMPCO Office, 1116 Jackson Street, Monroe, LA", description: "Week 4 of 8 — Investing: Grow your wealth and secure your future. FREE class open to the public. In-person & virtual options available.", category: "Education & Skills" },
+  { id: "fl_w5", title: "Financial Literacy – Week 5: Protecting Your Future", date: "2026-07-08", endDate: "2026-07-08", time: "5:30 PM", location: "HAMPCO Office, 1116 Jackson Street, Monroe, LA", description: "Week 5 of 8 — Protecting Your Future: Insurance, retirement planning, and financial well-being. FREE class open to the public. In-person & virtual options available.", category: "Education & Skills" },
+  { id: "fl_w6", title: "Financial Literacy – Week 6: Banking Basics", date: "2026-07-15", endDate: "2026-07-15", time: "5:30 PM", location: "HAMPCO Office, 1116 Jackson Street, Monroe, LA", description: "Week 6 of 8 — Banking Basics: Navigating checking/savings accounts, direct deposit, and avoiding fees. FREE class open to the public. In-person & virtual options available.", category: "Education & Skills" },
+  { id: "fl_w7", title: "Financial Literacy – Week 7: Taxes & Income", date: "2026-07-22", endDate: "2026-07-22", time: "5:30 PM", location: "HAMPCO Office, 1116 Jackson Street, Monroe, LA", description: "Week 7 of 8 — Taxes & Income: Understanding your paycheck, W-2s, and local tax obligations. FREE class open to the public. In-person & virtual options available.", category: "Education & Skills" },
+  { id: "fl_w8", title: "Financial Literacy – Week 8: Financial Planning", date: "2026-07-29", endDate: "2026-07-29", time: "5:30 PM", location: "HAMPCO Office, 1116 Jackson Street, Monroe, LA", description: "Week 8 of 8 — Financial Planning: Building a personalized 1-year financial plan. Graduation & certificates for all completers. FREE class open to the public. In-person & virtual options available.", category: "Education & Skills" }
 ];
 
 const DEFAULT_GALLERIES = [
@@ -185,7 +183,9 @@ export default function App() {
   const [events, setEvents] = useState(() => {
     const saved = localStorage.getItem('hampco_events');
     if (saved) {
-      const parsed: typeof DEFAULT_EVENTS = JSON.parse(saved);
+      let parsed: any[] = JSON.parse(saved);
+      // Migrate: remove old single Financial Literacy event and replace with 8 weekly sessions
+      parsed = parsed.filter((e: any) => e.id !== 'e7');
       const savedIds = new Set(parsed.map((e: any) => e.id));
       const missing = DEFAULT_EVENTS.filter(e => !savedIds.has(e.id));
       return missing.length > 0 ? [...parsed, ...missing] : parsed;
@@ -1131,14 +1131,17 @@ export default function App() {
           </div>
 
           <div className="space-y-6">
-            {events.length === 0 ? (
+            {events.filter((evt: any) => new Date(evt.endDate || evt.date).setHours(23,59,59,999) >= Date.now()).length === 0 ? (
               <div className="bg-slate-50 rounded-2xl p-12 text-center border-2 border-dashed border-slate-200">
                 <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-4" />
                 <h4 className="text-lg font-bold text-slate-700">No Scheduled Events</h4>
                 <p className="text-xs text-slate-500 mt-1">Check back later or log in as admin to add fresh programmatic classes!</p>
               </div>
             ) : (
-              events.map((evt) => (
+              [...events]
+                .filter((evt: any) => new Date(evt.endDate || evt.date).setHours(23,59,59,999) >= Date.now())
+                .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                .map((evt: any) => (
                 <div 
                   key={evt.id} 
                   className="bg-slate-50 hover:bg-red-50/10 border border-slate-200 hover:border-red-200 rounded-2xl p-6 sm:p-8 transition-all flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6"
