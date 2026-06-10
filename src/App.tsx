@@ -34,7 +34,8 @@ import {
   AlertTriangle,
   LogOut,
   Sliders,
-  Handshake
+  Handshake,
+  Copy
 } from 'lucide-react';
 
 const supabase = createClient(
@@ -315,6 +316,16 @@ export default function App() {
     if (confirm("Are you sure you want to delete this event?")) {
       setEvents(prev => prev.filter(evt => evt.id !== id));
     }
+  };
+
+  const handleDuplicateEvent = (evt) => {
+    const copy = { ...evt, id: "event_" + Date.now(), title: evt.title + " (Copy)" };
+    setEvents(prev => {
+      const idx = prev.findIndex(e => e.id === evt.id);
+      const next = [...prev];
+      next.splice(idx + 1, 0, copy);
+      return next;
+    });
   };
 
   // Gallery actions
@@ -1637,6 +1648,14 @@ export default function App() {
                           </p>
                         </div>
                         <div className="flex items-center space-x-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleDuplicateEvent(evt)}
+                            className="p-2 bg-neutral-800 hover:bg-neutral-700 text-sky-400 rounded border border-neutral-700 transition-all"
+                            title="Duplicate"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
                           <button
                             type="button"
                             onClick={() => handleEditEventClick(evt)}
