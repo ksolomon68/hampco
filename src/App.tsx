@@ -193,7 +193,7 @@ export default function App() {
 
   // Gallery view controls
   const [selectedGalleryId, setSelectedGalleryId] = useState("all");
-  const [lightboxImage, setLightboxImage] = useState(null); // { url: string, title: string }
+  const [lightboxImage, setLightboxImage] = useState<{ url: string; title: string } | null>(null);
 
   // Admin states for adding/editing
   const [editingEventId, setEditingEventId] = useState(null);
@@ -485,7 +485,7 @@ export default function App() {
                 alt="HAMPCO, Inc. Logo" 
                 className="h-12 sm:h-14 md:h-16 object-contain transition-transform group-hover:scale-102"
                 onError={(e) => {
-                  e.target.style.display = 'none';
+                  (e.target as HTMLImageElement).style.display = 'none';
                   const fallbackEl = document.getElementById('brand-fallback');
                   if (fallbackEl) fallbackEl.style.display = 'flex';
                 }}
@@ -663,7 +663,7 @@ export default function App() {
                     alt="HAMPCO Favicon Heart Icon"
                     className="w-28 h-28 object-contain opacity-90 filter drop-shadow-lg"
                     onError={(e) => {
-                      e.target.src = "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&q=80&w=600";
+                      (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&q=80&w=600";
                     }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-transparent to-transparent"></div>
@@ -1415,7 +1415,7 @@ export default function App() {
                     <label className="block text-slate-700 font-bold mb-1">How can HAMPCO assist you?</label>
                     <textarea 
                       required
-                      rows="4"
+                      rows={4}
                       value={contactForm.message}
                       onChange={(e) => setContactForm(prev => ({ ...prev, message: e.target.value }))}
                       placeholder="Type details here: pickup a scholarship kit, register a student for cooking class, sponsorship questions, etc."
@@ -1592,7 +1592,7 @@ export default function App() {
                     <div>
                       <label className="block text-slate-300 font-medium mb-1">Main Announcement Body Content Text</label>
                       <textarea
-                        rows="3"
+                        rows={3}
                         value={popup.message}
                         onChange={(e) => updatePopupConfig('message', e.target.value)}
                         className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
@@ -1679,7 +1679,7 @@ export default function App() {
                   <div>
                     <label className="block text-slate-300 font-bold mb-1">Brief Description of the Event</label>
                     <textarea 
-                      rows="3"
+                      rows={3}
                       required
                       value={newEvent.description}
                       onChange={(e) => setNewEvent(prev => ({ ...prev, description: e.target.value }))}
@@ -1895,7 +1895,7 @@ export default function App() {
                 src="ico-128x119.png" 
                 alt="Favicon Heart" 
                 className="w-8 h-8 object-contain"
-                onError={(e) => { e.target.style.display = 'none'; }}
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
               />
               <div>
                 <span className="text-white text-base font-black tracking-wider block">HAMPCO, INC.</span>
