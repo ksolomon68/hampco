@@ -114,6 +114,16 @@ const DEFAULT_EVENTS = [
     location: "Monroe, LA",
     description: "Wanda's Abounding Grace presents the Walk Around the Block for Autism — a 5K fun run and community festival hosted in partnership with HAMPCO, Inc. Join us in raising awareness and support for the autism community.",
     category: "Health & Nutrition"
+  },
+  {
+    id: "e7",
+    title: "Financial Literacy Classes",
+    date: "2026-06-10",
+    endDate: "2026-08-12",
+    time: "Tuesdays at 5:30 PM",
+    location: "HAMPCO Office, 1116 Jackson Street, Monroe, LA",
+    description: "FREE 8-week financial literacy series open to the community. Topics include budgeting, credit & debt management, saving, investing, and protecting your future. In-person and virtual options available. Classes are free and open to the public. Register at www.hampcoinc.org.",
+    category: "Education & Skills"
   }
 ];
 
@@ -936,10 +946,10 @@ export default function App() {
             {/* Program 3 */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-xl transition-all flex flex-col group">
               <div className="h-48 relative overflow-hidden bg-neutral-900">
-                <img 
-                  src="https://images.unsplash.com/photo-1543269865-cbf427effbad?auto=format&fit=crop&q=80&w=600" 
-                  alt="Diamonds in the rough etiquette"
-                  className="w-full h-full object-cover group-hover:scale-105 transition-all duration-300"
+                <img
+                  src="https://hampcoinc.org/assets/images/diamonds-cooking-1.jpg-1151x1535.jpeg"
+                  alt="Diamonds in the Rough program participants"
+                  className="w-full h-full object-cover object-top group-hover:scale-105 transition-all duration-300"
                 />
                 <div className="absolute top-3 right-3 bg-red-600 text-white font-bold text-[10px] uppercase tracking-wider px-2.5 py-1 rounded">
                   Social Etiquette
@@ -989,10 +999,10 @@ export default function App() {
             <div id="scholarships" className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-xl transition-all flex flex-col group lg:col-span-2">
               <div className="grid grid-cols-1 md:grid-cols-12 h-full">
                 <div className="h-48 md:h-auto md:col-span-5 relative bg-neutral-950">
-                  <img 
-                    src="https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&q=80&w=600" 
-                    alt="Scholarship cap"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-all duration-300"
+                  <img
+                    src="https://hampcoinc.org/assets/images/3076924166095057197.jpg-1080x1440.jpeg"
+                    alt="HAMPCO Scholarship Ceremony"
+                    className="w-full h-full object-cover object-top group-hover:scale-105 transition-all duration-300"
                   />
                   <div className="absolute top-3 left-3 bg-neutral-950 text-white font-black text-[10px] uppercase tracking-widest px-3 py-1 rounded border border-red-500/40">
                     Annual Funding
