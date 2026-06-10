@@ -270,6 +270,16 @@ export default function App() {
     return () => window.removeEventListener('hashchange', checkHash);
   }, []);
 
+  // Scroll-reveal: add .visible to .reveal* elements when they enter the viewport
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } }),
+      { threshold: 0.12 }
+    );
+    document.querySelectorAll('.reveal, .reveal-left, .reveal-right, .reveal-scale').forEach(el => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
+
   // Scroll to section helper
   const scrollToSection = (id) => {
     setActiveTab(id);
@@ -641,48 +651,78 @@ export default function App() {
 
       {/* --- HERO SECTION --- */}
       <section id="home" className="relative bg-gradient-to-br from-neutral-900 via-neutral-950 to-black text-white overflow-hidden py-16 sm:py-24">
-        {/* Abstract background graphics */}
-        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#ef4444_1px,transparent_1px)] [background-size:16px_16px]"></div>
-        <div className="absolute right-0 bottom-0 w-96 h-96 bg-red-600 rounded-full blur-3xl opacity-15 transform translate-x-1/2 translate-y-1/2"></div>
-        <div className="absolute left-0 top-1/3 w-80 h-80 bg-slate-800 rounded-full blur-3xl opacity-20 transform -translate-x-1/2"></div>
+        {/* Animated dot-grid */}
+        <div className="absolute inset-0 opacity-[0.07] bg-[radial-gradient(#ef4444_1px,transparent_1px)] [background-size:20px_20px]"></div>
+
+        {/* Large animated orbs */}
+        <div className="animate-orb-a absolute right-0 bottom-0 w-[520px] h-[520px] bg-red-600 rounded-full blur-[100px] opacity-[0.18] translate-x-1/3 translate-y-1/3 pointer-events-none"></div>
+        <div className="animate-orb-b absolute left-0 top-1/4 w-[420px] h-[420px] bg-slate-700 rounded-full blur-[90px] opacity-[0.22] -translate-x-1/3 pointer-events-none"></div>
+        <div className="animate-orb-c absolute left-1/2 top-0 w-[300px] h-[300px] bg-red-900 rounded-full blur-[80px] opacity-[0.14] -translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
+
+        {/* Slow-spinning decorative ring */}
+        <div className="animate-spin-slow absolute right-12 top-12 w-48 h-48 border border-red-500/10 rounded-full pointer-events-none"></div>
+        <div className="animate-spin-slow absolute right-12 top-12 w-72 h-72 border border-red-500/5 rounded-full pointer-events-none" style={{ animationDirection: 'reverse', animationDuration: '30s' }}></div>
+
+        {/* Rising particles */}
+        {[
+          { size: 3, left: '8%',  delay: '0s',   dur: '9s',  px: '12px'  },
+          { size: 2, left: '18%', delay: '1.5s', dur: '11s', px: '-8px'  },
+          { size: 4, left: '32%', delay: '3s',   dur: '8s',  px: '20px'  },
+          { size: 2, left: '50%', delay: '0.8s', dur: '13s', px: '-15px' },
+          { size: 3, left: '65%', delay: '2.2s', dur: '10s', px: '10px'  },
+          { size: 2, left: '78%', delay: '4s',   dur: '12s', px: '-20px' },
+          { size: 4, left: '88%', delay: '1s',   dur: '7s',  px: '5px'   },
+          { size: 2, left: '42%', delay: '5s',   dur: '14s', px: '18px'  },
+        ].map((p, i) => (
+          <div
+            key={i}
+            className="absolute bottom-0 rounded-full bg-red-500/40 pointer-events-none"
+            style={{
+              width: p.size, height: p.size,
+              left: p.left,
+              ['--px' as any]: p.px,
+              animation: `particle-rise ${p.dur} linear ${p.delay} infinite`,
+            }}
+          />
+        ))}
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           
           <div className="lg:col-span-7 space-y-6">
-            <div className="inline-flex items-center space-x-2 bg-neutral-900/80 border border-red-500/30 px-4 py-2 rounded-full text-red-400 text-xs font-bold uppercase tracking-wider">
+            <div className="hero-fade-1 inline-flex items-center space-x-2 bg-neutral-900/80 border border-red-500/30 px-4 py-2 rounded-full text-red-400 text-xs font-bold uppercase tracking-wider">
               <Sparkles className="w-3.5 h-3.5 text-red-500" />
               <span>Est. 1992 | Monroe, Northeast Louisiana</span>
             </div>
-            
-            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-tight">
+
+            <h2 className="hero-fade-2 text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-tight">
               Empowering Families. <br className="hidden sm:inline" />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-red-400 to-white">
                 Building Stronger Communities.
               </span>
             </h2>
 
-            <p className="text-base sm:text-lg text-slate-300 max-w-2xl font-light leading-relaxed">
+            <p className="hero-fade-3 text-base sm:text-lg text-slate-300 max-w-2xl font-light leading-relaxed">
               HAMPCO, Inc. is dedicated to acts of socioeconomic elevation, teen mentorship, art nourishment, healthcare outreach, and financial literacy. We serve as a pillar of assistance for high-potential, underserved citizens across our region.
             </p>
 
-            <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4 pt-4">
-              <button 
+            <div className="hero-fade-4 flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4 pt-4">
+              <button
                 onClick={() => scrollToSection("programs")}
-                className="bg-red-600 hover:bg-red-700 text-white font-extrabold px-8 py-4 rounded-xl shadow-lg shadow-red-600/10 hover:shadow-red-600/20 transition-all flex items-center justify-center space-x-2"
+                className="bg-red-600 hover:bg-red-700 text-white font-extrabold px-8 py-4 rounded-xl shadow-lg shadow-red-600/10 hover:shadow-red-600/20 hover:scale-[1.03] transition-all flex items-center justify-center space-x-2"
               >
                 <span>Explore Our Programs</span>
                 <ChevronRight className="w-4 h-4" />
               </button>
-              <button 
+              <button
                 onClick={() => scrollToSection("about")}
-                className="bg-white/5 hover:bg-white/15 text-white border border-white/20 font-bold px-8 py-4 rounded-xl transition-all flex items-center justify-center"
+                className="bg-white/5 hover:bg-white/15 text-white border border-white/20 font-bold px-8 py-4 rounded-xl hover:scale-[1.03] transition-all flex items-center justify-center"
               >
                 Learn Our History
               </button>
             </div>
 
             {/* Quick Metrics Badge aligned with official colorways */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-8 border-t border-neutral-800">
+            <div className="hero-fade-5 grid grid-cols-2 sm:grid-cols-4 gap-4 pt-8 border-t border-neutral-800">
               <div>
                 <h4 className="text-3xl font-black text-red-500">400K+</h4>
                 <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mt-0.5">Citizens Served</p>
@@ -703,7 +743,7 @@ export default function App() {
           </div>
 
           {/* Right Hero Card Panel utilizing heart favicon */}
-          <div className="lg:col-span-5 relative">
+          <div className="hero-right lg:col-span-5 relative">
             <div className="relative mx-auto max-w-md lg:max-w-none">
               <div className="absolute -inset-4 bg-gradient-to-tr from-red-600 to-neutral-900 rounded-3xl opacity-20 blur-lg"></div>
               
@@ -726,7 +766,7 @@ export default function App() {
 
                 <div className="space-y-2">
                   <h3 className="text-lg font-bold text-white flex items-center">
-                    <Heart className="w-5 h-5 text-red-500 mr-2 shrink-0 fill-red-500" />
+                    <Heart className="animate-heartbeat w-5 h-5 text-red-500 mr-2 shrink-0 fill-red-500" />
                     Building Stronger Communities
                   </h3>
                   <p className="text-xs text-slate-300 leading-relaxed font-light">
@@ -764,8 +804,8 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 items-center">
-            
-            <div className="lg:col-span-5 space-y-6">
+
+            <div className="reveal-left lg:col-span-5 space-y-6">
               <div className="text-red-600 font-extrabold text-sm uppercase tracking-wider flex items-center">
                 <Info className="w-4 h-4 mr-2" />
                 Who We Are
@@ -790,10 +830,10 @@ export default function App() {
               </div>
             </div>
 
-            <div className="lg:col-span-7 space-y-8">
+            <div className="reveal-right lg:col-span-7 space-y-8">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                
-                <div className="bg-slate-50 p-6 rounded-2xl space-y-3 border border-slate-100 hover:shadow-md transition-all">
+
+                <div className="reveal-scale delay-100 bg-slate-50 p-6 rounded-2xl space-y-3 border border-slate-100 hover:shadow-md hover:-translate-y-1 transition-all duration-300">
                   <div className="w-10 h-10 rounded-lg bg-red-50 text-red-600 flex items-center justify-center font-bold">
                     <Award className="w-5 h-5" />
                   </div>
@@ -803,7 +843,7 @@ export default function App() {
                   </p>
                 </div>
 
-                <div className="bg-slate-50 p-6 rounded-2xl space-y-3 border border-slate-100 hover:shadow-md transition-all">
+                <div className="reveal-scale delay-200 bg-slate-50 p-6 rounded-2xl space-y-3 border border-slate-100 hover:shadow-md hover:-translate-y-1 transition-all duration-300">
                   <div className="w-10 h-10 rounded-lg bg-slate-100 text-neutral-900 flex items-center justify-center font-bold">
                     <Users className="w-5 h-5" />
                   </div>
@@ -813,7 +853,7 @@ export default function App() {
                   </p>
                 </div>
 
-                <div className="bg-slate-50 p-6 rounded-2xl space-y-3 border border-slate-100 hover:shadow-md transition-all">
+                <div className="reveal-scale delay-200 bg-slate-50 p-6 rounded-2xl space-y-3 border border-slate-100 hover:shadow-md hover:-translate-y-1 transition-all duration-300">
                   <div className="w-10 h-10 rounded-lg bg-red-50 text-red-600 flex items-center justify-center font-bold">
                     <BookOpen className="w-5 h-5" />
                   </div>
@@ -823,7 +863,7 @@ export default function App() {
                   </p>
                 </div>
 
-                <div className="bg-slate-50 p-6 rounded-2xl space-y-3 border border-slate-100 hover:shadow-md transition-all">
+                <div className="reveal-scale delay-300 bg-slate-50 p-6 rounded-2xl space-y-3 border border-slate-100 hover:shadow-md hover:-translate-y-1 transition-all duration-300">
                   <div className="w-10 h-10 rounded-lg bg-slate-100 text-neutral-900 flex items-center justify-center font-bold">
                     <Heart className="w-5 h-5" />
                   </div>
@@ -883,7 +923,7 @@ export default function App() {
       <section id="programs" className="py-20 bg-slate-100 border-t border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
-          <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
+          <div className="reveal text-center max-w-3xl mx-auto mb-16 space-y-4">
             <span className="text-red-600 font-extrabold text-xs uppercase tracking-widest bg-red-100/80 px-3.5 py-1.5 rounded-full inline-block">
               Empowerment Programs
             </span>
@@ -896,9 +936,9 @@ export default function App() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            
+
             {/* Program 1 */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-xl transition-all flex flex-col group">
+            <div className="reveal-scale delay-100 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col group">
               <div className="h-48 relative overflow-hidden bg-neutral-900">
                 <img 
                   src="https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&q=80&w=600" 
@@ -924,7 +964,7 @@ export default function App() {
             </div>
 
             {/* Program 2 */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-xl transition-all flex flex-col group">
+            <div className="reveal-scale delay-200 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col group">
               <div className="h-48 relative overflow-hidden bg-neutral-900">
                 <img 
                   src="https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&q=80&w=600" 
@@ -950,7 +990,7 @@ export default function App() {
             </div>
 
             {/* Program 3 */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-xl transition-all flex flex-col group">
+            <div className="reveal-scale delay-300 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col group">
               <div className="h-48 relative overflow-hidden bg-neutral-900">
                 <img
                   src="https://hampcoinc.org/assets/images/diamonds-cooking-1.jpg-1151x1535.jpeg"
@@ -976,7 +1016,7 @@ export default function App() {
             </div>
 
             {/* Program 4 */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-xl transition-all flex flex-col group">
+            <div className="reveal-scale delay-400 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col group">
               <div className="h-48 relative overflow-hidden bg-neutral-900">
                 <img 
                   src="https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?auto=format&fit=crop&q=80&w=600" 
@@ -1002,7 +1042,7 @@ export default function App() {
             </div>
 
             {/* Program 5 - Scholarships */}
-            <div id="scholarships" className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-xl transition-all flex flex-col group lg:col-span-2">
+            <div id="scholarships" className="reveal-scale delay-500 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col group lg:col-span-2">
               <div className="grid grid-cols-1 md:grid-cols-12 h-full">
                 <div className="h-48 md:h-auto md:col-span-5 relative bg-neutral-950">
                   <img
@@ -1054,7 +1094,7 @@ export default function App() {
       <section id="partners" className="py-16 bg-white border-t border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-          <div className="text-center mb-10 space-y-3">
+          <div className="reveal text-center mb-10 space-y-3">
             <span className="text-red-600 font-extrabold text-xs uppercase tracking-widest bg-red-50 px-3.5 py-1.5 rounded-full inline-flex items-center gap-1.5">
               <Handshake className="w-4 h-4" />
               Community Partners
@@ -1076,7 +1116,7 @@ export default function App() {
               { name: "Renaissance Movement Committee", desc: "Hosts the annual Black History Parade honoring legacy and achievements of the Black community.", category: "Culture" },
               { name: "United Minds of Joint Action Association", desc: "Juneteenth coalition bringing together community organizations for shared celebration and action.", category: "Community" },
             ].map((partner, i) => (
-              <div key={i} className="bg-slate-50 border border-slate-200 rounded-xl p-5 hover:border-red-200 hover:shadow-sm transition-all">
+              <div key={i} className={`reveal-scale bg-slate-50 border border-slate-200 rounded-xl p-5 hover:border-red-200 hover:shadow-md hover:-translate-y-1 transition-all duration-300 delay-${Math.min(i * 100, 500)}`}>
                 <div className="flex items-start space-x-3">
                   <div className="w-8 h-8 rounded bg-red-600 flex items-center justify-center shrink-0 mt-0.5">
                     <Handshake className="w-4 h-4 text-white" />
@@ -1115,7 +1155,7 @@ export default function App() {
       <section id="events" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
-          <div className="flex flex-col md:flex-row md:items-end justify-between mb-12">
+          <div className="reveal flex flex-col md:flex-row md:items-end justify-between mb-12">
             <div>
               <span className="text-red-600 font-extrabold text-sm uppercase tracking-wider flex items-center">
                 <Calendar className="w-4 h-4 mr-1.5" />
@@ -1141,10 +1181,10 @@ export default function App() {
               [...events]
                 .filter((evt: any) => new Date(evt.endDate || evt.date).setHours(23,59,59,999) >= Date.now())
                 .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                .map((evt: any) => (
-                <div 
-                  key={evt.id} 
-                  className="bg-slate-50 hover:bg-red-50/10 border border-slate-200 hover:border-red-200 rounded-2xl p-6 sm:p-8 transition-all flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6"
+                .map((evt: any, idx: number) => (
+                <div
+                  key={evt.id}
+                  className={`reveal bg-slate-50 hover:bg-red-50/10 border border-slate-200 hover:border-red-200 rounded-2xl p-6 sm:p-8 transition-all flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 delay-${Math.min(idx * 100, 500)}`}
                 >
                   <div className="flex items-start space-x-5 lg:col-span-8">
                     {/* Date badge matching branding */}
@@ -1216,7 +1256,7 @@ export default function App() {
       <section id="gallery" className="py-20 bg-slate-100 border-t border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
-          <div className="text-center max-w-2xl mx-auto mb-12 space-y-3">
+          <div className="reveal text-center max-w-2xl mx-auto mb-12 space-y-3">
             <span className="text-red-600 font-extrabold text-sm uppercase tracking-wider flex items-center justify-center">
               <Camera className="w-4 h-4 mr-1.5" />
               Community Portfolios
@@ -1297,10 +1337,10 @@ export default function App() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                      {gal.images.map((img) => (
-                        <div 
+                      {gal.images.map((img, imgIdx: number) => (
+                        <div
                           key={img.id}
-                          className="relative group rounded-xl overflow-hidden bg-slate-100 aspect-square shadow-sm border border-slate-200 cursor-pointer"
+                          className={`reveal-scale relative group rounded-xl overflow-hidden bg-slate-100 aspect-square shadow-sm border border-slate-200 cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 delay-${Math.min(imgIdx * 100, 500)}`}
                         >
                           <img 
                             src={img.url} 
@@ -1346,7 +1386,7 @@ export default function App() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16">
             
             {/* Info Column */}
-            <div className="lg:col-span-5 space-y-8">
+            <div className="reveal-left lg:col-span-5 space-y-8">
               <div className="space-y-2">
                 <span className="text-red-600 font-extrabold text-sm uppercase tracking-wider block">Get In Touch</span>
                 <h3 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">HAMPCO Head Office</h3>
@@ -1416,7 +1456,7 @@ export default function App() {
             </div>
 
             {/* Form Column */}
-            <div className="lg:col-span-7 bg-slate-50 p-6 sm:p-8 rounded-2xl border border-slate-200">
+            <div className="reveal-right lg:col-span-7 bg-slate-50 p-6 sm:p-8 rounded-2xl border border-slate-200">
               <h4 className="text-xl font-bold text-slate-900 mb-2">Send HAMPCO An Email Inquiry</h4>
               <p className="text-xs text-slate-500 mb-6">Fill in details below to directly email our administration team regarding sponsorships, student art entry, or scholarships.</p>
               

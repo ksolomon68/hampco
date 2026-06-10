@@ -1,1 +1,123 @@
 @import "tailwindcss";
+
+/* =============================================
+   HAMPCO ANIMATIONS
+   ============================================= */
+
+/* --- Hero background orbs --- */
+@keyframes orb-float-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(45px, -35px) scale(1.12); }
+  66%       { transform: translate(-25px, 25px) scale(0.88); }
+}
+@keyframes orb-float-b {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  40%       { transform: translate(-40px, 30px) scale(1.08); }
+  80%       { transform: translate(30px, -15px) scale(0.94); }
+}
+@keyframes orb-float-c {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%       { transform: translateY(-28px) scale(1.06); }
+}
+
+/* --- Rising particles --- */
+@keyframes particle-rise {
+  0%   { transform: translateY(0) translateX(0) rotate(0deg);   opacity: 0; }
+  5%   { opacity: 0.8; }
+  90%  { opacity: 0.4; }
+  100% { transform: translateY(-100vh) translateX(var(--px, 20px)) rotate(540deg); opacity: 0; }
+}
+
+/* --- Scroll-reveal base --- */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeInLeft {
+  from { opacity: 0; transform: translateX(-28px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes fadeInRight {
+  from { opacity: 0; transform: translateX(28px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* --- Shimmer gradient (animated background) --- */
+@keyframes gradient-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* --- Floating heartbeat for hero card icon --- */
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); }
+  14%       { transform: scale(1.18); }
+  28%       { transform: scale(1); }
+  42%       { transform: scale(1.12); }
+  56%       { transform: scale(1); }
+}
+
+/* --- Slow spin for decorative ring --- */
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* =============================================
+   UTILITY CLASSES
+   ============================================= */
+
+.animate-orb-a    { animation: orb-float-a 14s ease-in-out infinite; }
+.animate-orb-b    { animation: orb-float-b 18s ease-in-out infinite; }
+.animate-orb-c    { animation: orb-float-c 9s  ease-in-out infinite; }
+.animate-heartbeat { animation: heartbeat 2.8s ease-in-out infinite; }
+.animate-spin-slow { animation: spin-slow 20s linear infinite; }
+
+/* Hero content staggered entrance */
+.hero-fade-1 { animation: fadeInUp 0.7s ease both; animation-delay: 0.1s; }
+.hero-fade-2 { animation: fadeInUp 0.7s ease both; animation-delay: 0.25s; }
+.hero-fade-3 { animation: fadeInUp 0.7s ease both; animation-delay: 0.4s; }
+.hero-fade-4 { animation: fadeInUp 0.7s ease both; animation-delay: 0.55s; }
+.hero-fade-5 { animation: fadeInUp 0.7s ease both; animation-delay: 0.7s; }
+.hero-right  { animation: fadeInRight 0.8s ease both; animation-delay: 0.45s; }
+
+/* Scroll-reveal: invisible until .visible is toggled by IntersectionObserver */
+.reveal, .reveal-left, .reveal-right, .reveal-scale {
+  transition-property: opacity, transform;
+  transition-duration: 0.65s;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal       { opacity: 0; transform: translateY(24px); }
+.reveal-left  { opacity: 0; transform: translateX(-24px); }
+.reveal-right { opacity: 0; transform: translateX(24px); }
+.reveal-scale { opacity: 0; transform: scale(0.93); }
+
+.reveal.visible, .reveal-left.visible,
+.reveal-right.visible, .reveal-scale.visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Stagger helpers */
+.delay-100 { transition-delay: 0.10s; }
+.delay-200 { transition-delay: 0.20s; }
+.delay-300 { transition-delay: 0.30s; }
+.delay-400 { transition-delay: 0.40s; }
+.delay-500 { transition-delay: 0.50s; }
+.delay-600 { transition-delay: 0.60s; }
+
+/* =============================================
+   REDUCED-MOTION SAFETY
+   ============================================= */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
