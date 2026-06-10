@@ -209,6 +209,8 @@ export default function App() {
   const [newImage, setNewImage] = useState({ url: "", title: "" });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [editingImage, setEditingImage] = useState<{ galleryId: string; imageId: string; title: string; url: string } | null>(null);
+  const [expandedGalleryId, setExpandedGalleryId] = useState<string>("");
 
   // Contact form submission feedback
   const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", message: "" });
@@ -378,6 +380,19 @@ export default function App() {
     }));
 
     setNewImage({ url: "", title: "" });
+  };
+
+  const handleSaveImageEdit = () => {
+    if (!editingImage) return;
+    setGalleries(prev => prev.map(gal =>
+      gal.id !== editingImage.galleryId ? gal : {
+        ...gal,
+        images: gal.images.map(img =>
+          img.id !== editingImage.imageId ? img : { ...img, title: editingImage.title, url: editingImage.url }
+        )
+      }
+    ));
+    setEditingImage(null);
   };
 
   const handleDeleteImageFromGallery = (galleryId, imageId) => {
@@ -1817,7 +1832,113 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* 1. Create Gallery */}
+                {/* 1. Manage existing gallery images */}
+                <div className="border-t border-neutral-800 pt-6 space-y-4">
+                  <div>
+                    <h4 className="text-lg font-bold text-white flex items-center">
+                      <Layers className="w-5 h-5 mr-2 text-red-500" />
+                      Manage Gallery Photos
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-1">Select a gallery to view, edit captions, replace photos, or remove images.</p>
+                  </div>
+
+                  {/* Gallery selector tabs */}
+                  <div className="flex flex-wrap gap-2">
+                    {galleries.map(gal => (
+                      <button
+                        key={gal.id}
+                        type="button"
+                        onClick={() => setExpandedGalleryId(expandedGalleryId === gal.id ? "" : gal.id)}
+                        className={`px-3 py-1.5 rounded text-xs font-bold transition-all border ${
+                          expandedGalleryId === gal.id
+                            ? "bg-red-600 text-white border-red-600"
+                            : "bg-neutral-900 text-slate-300 border-neutral-700 hover:border-red-500"
+                        }`}
+                      >
+                        {gal.title} ({gal.images?.length ?? 0})
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Image list for selected gallery */}
+                  {expandedGalleryId && (() => {
+                    const gal = galleries.find(g => g.id === expandedGalleryId);
+                    if (!gal) return null;
+                    return (
+                      <div className="space-y-2">
+                        {(!gal.images || gal.images.length === 0) ? (
+                          <p className="text-slate-500 text-xs italic">No photos in this gallery yet.</p>
+                        ) : gal.images.map(img => (
+                          <div key={img.id} className="bg-neutral-900 border border-neutral-800 rounded-lg p-3">
+                            {editingImage?.imageId === img.id && editingImage ? (
+                              /* Inline edit form */
+                              <div className="space-y-3">
+                                <div className="flex gap-3 items-start">
+                                  <img src={editingImage.url} alt={editingImage.title} className="w-16 h-16 object-cover rounded shrink-0 border border-neutral-700" />
+                                  <div className="flex-1 space-y-2">
+                                    <div>
+                                      <label className="block text-slate-400 text-[11px] font-bold mb-1">Caption</label>
+                                      <input
+                                        type="text"
+                                        value={editingImage.title}
+                                        onChange={e => setEditingImage(prev => prev ? { ...prev, title: e.target.value } : prev)}
+                                        className="w-full px-3 py-1.5 rounded bg-neutral-800 border border-neutral-700 text-white text-xs focus:outline-none focus:border-red-500"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-slate-400 text-[11px] font-bold mb-1">Replace Photo</label>
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={async e => {
+                                          const file = e.target.files?.[0];
+                                          if (!file) return;
+                                          const url = await handleFileUpload(file);
+                                          if (url) setEditingImage(prev => prev ? { ...prev, url } : prev);
+                                        }}
+                                        className="w-full px-2 py-1 rounded bg-neutral-800 border border-neutral-700 text-white text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-bold file:bg-red-600 file:text-white cursor-pointer"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex justify-end gap-2">
+                                  <button type="button" onClick={() => setEditingImage(null)} className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-slate-300 rounded text-xs font-bold">Cancel</button>
+                                  <button type="button" onClick={handleSaveImageEdit} className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-bold">Save Changes</button>
+                                </div>
+                              </div>
+                            ) : (
+                              /* Normal row */
+                              <div className="flex items-center gap-3">
+                                <img src={img.url} alt={img.title} className="w-14 h-14 object-cover rounded shrink-0 border border-neutral-700" />
+                                <p className="flex-1 text-slate-200 text-xs font-medium truncate">{img.title}</p>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingImage({ galleryId: gal.id, imageId: img.id, title: img.title, url: img.url })}
+                                    className="p-2 bg-neutral-800 hover:bg-neutral-700 text-amber-400 rounded border border-neutral-700 transition-all"
+                                    title="Edit"
+                                  >
+                                    <Edit className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteImageFromGallery(gal.id, img.id)}
+                                    className="p-2 bg-red-600 hover:bg-red-700 text-white rounded transition-all"
+                                    title="Delete"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* 2. Create Gallery */}
                 <div className="space-y-4">
                   <div>
                     <h4 className="text-lg font-bold text-white flex items-center">
