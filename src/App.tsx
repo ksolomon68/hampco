@@ -184,7 +184,13 @@ export default function App() {
   
   const [events, setEvents] = useState(() => {
     const saved = localStorage.getItem('hampco_events');
-    return saved ? JSON.parse(saved) : DEFAULT_EVENTS;
+    if (saved) {
+      const parsed: typeof DEFAULT_EVENTS = JSON.parse(saved);
+      const savedIds = new Set(parsed.map((e: any) => e.id));
+      const missing = DEFAULT_EVENTS.filter(e => !savedIds.has(e.id));
+      return missing.length > 0 ? [...parsed, ...missing] : parsed;
+    }
+    return DEFAULT_EVENTS;
   });
 
   const [galleries, setGalleries] = useState(() => {
