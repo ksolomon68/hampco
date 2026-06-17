@@ -218,7 +218,6 @@ const DEFAULT_EVENTS = [
     category: "Education & Skills"
   }
 ];
-];
 
 const DEFAULT_GALLERIES = [
   {
