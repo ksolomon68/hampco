@@ -45,8 +45,20 @@ const supabase = createClient(
 
 // --- SEED / DEFAULT DATA ---
 
+const parseLocalDate = (dateStr: string) => {
+  if (!dateStr) return new Date();
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    const d = parseInt(parts[2], 10);
+    return new Date(y, m, d);
+  }
+  return new Date(dateStr);
+};
+
 const DEFAULT_POPUP = {
-  enabled: true,
+  enabled: false,
   title: "2026 Scholarship Application Deadline",
   message: "Attention students and families! HAMPCO, Inc. is now accepting scholarship applications for 2026. Ten $1,500.00 scholarships will be awarded to high school seniors in Senate District 34. All completed packets must be submitted to the HAMPCO Office by March 31, 2026.",
   buttonText: "Download Application Guidelines",
@@ -60,19 +72,19 @@ const DEFAULT_EVENTS = [
     title: "Summer Youth Art Classes",
     date: "2026-06-15",
     endDate: "2026-07-20",
-    time: "10:00 AM - 12:00 PM",
-    location: "HAMPCO Community Center, Monroe, LA",
+    time: "1:00 - 3:00 PM",
+    location: "HAMPCO Office, Monroe, LA",
     description: "Nurturing the creative minds of youth ages 8-15 through immersive painting, sculpture, and sketching instruction. Materials and refreshments are fully provided.",
     category: "Arts & Culture"
   },
   {
     id: "e2",
-    title: "Get L.I.T. – Eat Well Live Long Nutrition",
+    title: "5 Steps to a Healthier You",
     date: "2026-07-02",
     endDate: "2026-07-02",
-    time: "11:00 AM - 1:00 PM",
-    location: "District 34 Outreach Center, Monroe",
-    description: "Led by Nurse Practitioner Dr. Karen Gant. An interactive community wellness session detailing portion control, food labels, and fresh family meal preparation.",
+    time: "Various Times",
+    location: "Various locations - See schedule",
+    description: "An interactive community wellness program detailing the 5 steps to a healthier you. Classes are held at various times and locations.",
     category: "Health & Nutrition"
   },
   {
@@ -115,14 +127,97 @@ const DEFAULT_EVENTS = [
     description: "Wanda's Abounding Grace presents the Walk Around the Block for Autism — a 5K fun run and community festival hosted in partnership with HAMPCO, Inc. Join us in raising awareness and support for the autism community.",
     category: "Health & Nutrition"
   },
-  { id: "fl_w1", title: "Financial Literacy – Week 1: Budgeting", date: "2026-06-10", endDate: "2026-06-10", time: "5:30 PM", location: "HAMPCO Office, 1116 Jackson Street, Monroe, LA", description: "Week 1 of 8 — Budgeting: Learn to make your money work for you. FREE class open to the public. In-person & virtual options available. Register at www.hampcoinc.org.", category: "Education & Skills" },
-  { id: "fl_w2", title: "Financial Literacy – Week 2: Credit & Debt", date: "2026-06-17", endDate: "2026-06-17", time: "5:30 PM", location: "HAMPCO Office, 1116 Jackson Street, Monroe, LA", description: "Week 2 of 8 — Credit & Debt: Understand credit and manage debt wisely. FREE class open to the public. In-person & virtual options available.", category: "Education & Skills" },
-  { id: "fl_w3", title: "Financial Literacy – Week 3: Saving", date: "2026-06-24", endDate: "2026-06-24", time: "5:30 PM", location: "HAMPCO Office, 1116 Jackson Street, Monroe, LA", description: "Week 3 of 8 — Saving: Build an emergency fund and plan for your goals. FREE class open to the public. In-person & virtual options available.", category: "Education & Skills" },
-  { id: "fl_w4", title: "Financial Literacy – Week 4: Investing", date: "2026-07-01", endDate: "2026-07-01", time: "5:30 PM", location: "HAMPCO Office, 1116 Jackson Street, Monroe, LA", description: "Week 4 of 8 — Investing: Grow your wealth and secure your future. FREE class open to the public. In-person & virtual options available.", category: "Education & Skills" },
-  { id: "fl_w5", title: "Financial Literacy – Week 5: Protecting Your Future", date: "2026-07-08", endDate: "2026-07-08", time: "5:30 PM", location: "HAMPCO Office, 1116 Jackson Street, Monroe, LA", description: "Week 5 of 8 — Protecting Your Future: Insurance, retirement planning, and financial well-being. FREE class open to the public. In-person & virtual options available.", category: "Education & Skills" },
-  { id: "fl_w6", title: "Financial Literacy – Week 6: Banking Basics", date: "2026-07-15", endDate: "2026-07-15", time: "5:30 PM", location: "HAMPCO Office, 1116 Jackson Street, Monroe, LA", description: "Week 6 of 8 — Banking Basics: Navigating checking/savings accounts, direct deposit, and avoiding fees. FREE class open to the public. In-person & virtual options available.", category: "Education & Skills" },
-  { id: "fl_w7", title: "Financial Literacy – Week 7: Taxes & Income", date: "2026-07-22", endDate: "2026-07-22", time: "5:30 PM", location: "HAMPCO Office, 1116 Jackson Street, Monroe, LA", description: "Week 7 of 8 — Taxes & Income: Understanding your paycheck, W-2s, and local tax obligations. FREE class open to the public. In-person & virtual options available.", category: "Education & Skills" },
-  { id: "fl_w8", title: "Financial Literacy – Week 8: Financial Planning", date: "2026-07-29", endDate: "2026-07-29", time: "5:30 PM", location: "HAMPCO Office, 1116 Jackson Street, Monroe, LA", description: "Week 8 of 8 — Financial Planning: Building a personalized 1-year financial plan. Graduation & certificates for all completers. FREE class open to the public. In-person & virtual options available.", category: "Education & Skills" }
+  { 
+    id: "fl_w1", 
+    title: "Financial Literacy – Registration & Orientation / Week 1", 
+    date: "2026-06-16", 
+    endDate: "2026-06-16", 
+    time: "5:30 PM", 
+    location: "HAMPCO, INC., 1116 Jackson Street, Monroe, LA 71202", 
+    description: "Orientation & Topics: Money Matters – Budgeting, Money Matter – budgeting Review (Bio Part 2). All classes held at HAMPCO, INC. Call 318 361-2050 and ask for Irma or Mary.", 
+    category: "Education & Skills" 
+  },
+  { 
+    id: "fl_w2", 
+    title: "Financial Literacy – Week 2: Financial Goals Review", 
+    date: "2026-06-23", 
+    endDate: "2026-06-23", 
+    time: "5:30 PM", 
+    location: "HAMPCO, INC., 1116 Jackson Street, Monroe, LA 71202", 
+    description: "Topics: Financial Goals Review – Scams – Prevent Financial Exploitation. All classes held at HAMPCO, INC. Call 318 361-2050 and ask for Irma or Mary.", 
+    category: "Education & Skills" 
+  },
+  { 
+    id: "fl_w3", 
+    title: "Financial Literacy – Week 3: Owning Your Own Home", 
+    date: "2026-06-30", 
+    endDate: "2026-06-30", 
+    time: "5:30 PM", 
+    location: "HAMPCO, INC., 1116 Jackson Street, Monroe, LA 71202", 
+    description: "Topics: Owning your own HOME – Grants, Escrow, Taxes & Insurance. Guest speakers: Brenda & Ellen Hill & Ginger McGrew. All classes held at HAMPCO, INC.", 
+    category: "Education & Skills" 
+  },
+  { 
+    id: "fl_w4", 
+    title: "Financial Literacy – Week 4: Pay Yourself First", 
+    date: "2026-07-07", 
+    endDate: "2026-07-07", 
+    time: "5:30 PM", 
+    location: "HAMPCO, INC., 1116 Jackson Street, Monroe, LA 71202", 
+    description: "Topics: Pay Yourself First – How & when to save – Investments. Guest speaker: Blake. All classes held at HAMPCO, INC.", 
+    category: "Education & Skills" 
+  },
+  { 
+    id: "fl_w5", 
+    title: "Financial Literacy – Week 5: Understanding Credit & Personal Statements", 
+    date: "2026-07-14", 
+    endDate: "2026-07-14", 
+    time: "5:30 PM", 
+    location: "HAMPCO, INC. (Oliver Rd), 1116 Jackson Street, Monroe, LA 71202", 
+    description: "Topics: Understanding your Credit Report – Preparing A Personal Financial Statement. Guest speakers: Bankers in Retail, Commercial & Business Banking of First Horizon – One on One with Students. All classes held at HAMPCO, INC.", 
+    category: "Education & Skills" 
+  },
+  { 
+    id: "fl_w6", 
+    title: "Financial Literacy – Week 6: Bank On It", 
+    date: "2026-07-21", 
+    endDate: "2026-07-21", 
+    time: "5:30 PM", 
+    location: "HAMPCO, INC., 1116 Jackson Street, Monroe, LA 71202", 
+    description: "Topics: Bank On It – How to Handle A checking Account. All classes held at HAMPCO, INC.", 
+    category: "Education & Skills" 
+  },
+  { 
+    id: "fl_w7", 
+    title: "Financial Literacy – Week 7: Legal Terms & Matters in Banking", 
+    date: "2026-07-28", 
+    endDate: "2026-07-28", 
+    time: "5:30 PM", 
+    location: "HAMPCO, INC., 1116 Jackson Street, Monroe, LA 71202", 
+    description: "Topics: Understanding Legal Terms/Matters in Banking – Questions on POA, POD on accounts, Disability-SSI, Wills, Estates, inherited real estate, adjudicated real estate, etc. Guest speakers: Brenda & Guest Attorney. All classes held at HAMPCO, INC.", 
+    category: "Education & Skills" 
+  },
+  { 
+    id: "fl_w8", 
+    title: "Financial Literacy – Week 8: Review", 
+    date: "2026-08-04", 
+    endDate: "2026-08-04", 
+    time: "5:30 PM", 
+    location: "HAMPCO, INC., 1116 Jackson Street, Monroe, LA 71202", 
+    description: "Topics: Review – Pick up invites & gowns. All classes held at HAMPCO, INC.", 
+    category: "Education & Skills" 
+  },
+  {
+    id: "fl_grad",
+    title: "Financial Literacy Graduation Ceremony",
+    date: "2026-08-15",
+    endDate: "2026-08-15",
+    time: "9:00 AM (Graduates arrive at 8:00 AM)",
+    location: "Mt. Zion Family Life Center, Monroe, LA 71202",
+    description: "After completion of the classes, a graduation ceremony will be held for the participants & their Guest. Place: Mt. Zion Family Life Center. Graduates arrive at 8:00 a.m. for photos - the ceremony begins at 9:00 a.m. (SHARP)",
+    category: "Education & Skills"
+  }
+];
 ];
 
 const DEFAULT_GALLERIES = [
@@ -175,17 +270,19 @@ export default function App() {
       if (parsed.bgColor === 'emerald' || parsed.bgColor === 'amber') {
         parsed.bgColor = 'red';
       }
+      // Force disable old scholarship announcement
+      parsed.enabled = false;
       return parsed;
     }
-    return DEFAULT_POPUP;
+    return { ...DEFAULT_POPUP, enabled: false };
   });
   
   const [events, setEvents] = useState(() => {
     const saved = localStorage.getItem('hampco_events');
     if (saved) {
       let parsed: any[] = JSON.parse(saved);
-      // Migrate: remove old single Financial Literacy event and replace with 8 weekly sessions
-      parsed = parsed.filter((e: any) => e.id !== 'e7');
+      // Migrate: filter out old events to force reload updated versions
+      parsed = parsed.filter((e: any) => e.id !== 'e7' && e.id !== 'e1' && e.id !== 'e2' && !e.id.startsWith('fl_'));
       const savedIds = new Set(parsed.map((e: any) => e.id));
       const missing = DEFAULT_EVENTS.filter(e => !savedIds.has(e.id));
       return missing.length > 0 ? [...parsed, ...missing] : parsed;
@@ -893,7 +990,7 @@ export default function App() {
                     <ul className="space-y-1 text-slate-300">
                       <li><strong>Willie Hunter, Jr.</strong> – President</li>
                       <li><strong>Larry Wilson</strong> – Vice President</li>
-                      <li><strong>Olga Potter</strong> – Secretary</li>
+                      <li><strong>Stacy Newbill</strong> – Secretary</li>
                       <li><strong>Gary Hicks</strong> – Treasurer</li>
                       <li><strong>Constance Collins</strong> – Board Member</li>
                       <li><strong>Mona H. Gibbs</strong> – Board Member</li>
@@ -977,9 +1074,9 @@ export default function App() {
               </div>
               <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
                 <div className="space-y-2">
-                  <h4 className="text-xl font-bold text-slate-950">Eat Right Live Long</h4>
+                  <h4 className="text-xl font-bold text-slate-950">5 Steps to a Healthier You</h4>
                   <p className="text-xs text-slate-600 leading-relaxed">
-                    Led by Nurse Practitioner Dr. Karen Gant, the *Get L.I.T. – Eat Well Live Long* program educates individuals on healthy choices, calorie/sugar values, portion sizes, and grocery shopping to fight health deficiencies.
+                    Various times and locations - See schedule
                   </p>
                 </div>
                 <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500">
@@ -1059,13 +1156,12 @@ export default function App() {
                     <span className="text-[10px] text-red-600 font-extrabold uppercase tracking-widest">Senate District 34</span>
                     <h4 className="text-2xl font-black text-slate-950 leading-tight">HAMPCO Scholarship Program</h4>
                     <p className="text-xs text-slate-600 leading-relaxed">
-                      Every year, HAMPCO distributes **ten $1,500.00 scholarships** to selected deserving high school seniors accepted into a qualified college, university, or technical institution. Applications are vetted by local community volunteers based on academic progress, civic service, and financial necessity.
+                      Every year, Hampco does scholarships to selected deserving high school seniors accepted into a qualified college, university, or technical institution. Applications are vetted by local community volunteers based on academic progress, civic service, and financial necessity.
                     </p>
                     <div className="bg-slate-50 p-3 rounded-lg text-xs border border-slate-150">
-                      <p className="font-semibold text-slate-800">Requirements & Submission Details:</p>
+                      <p className="font-semibold text-slate-800">Requirements & Details:</p>
                       <ul className="list-disc list-inside text-slate-500 mt-1 space-y-0.5">
                         <li>Senior student residing within District 34</li>
-                        <li>Completed packet signed and delivered by March 31, 2026</li>
                         <li>Official transcript & proof of college acceptance required</li>
                       </ul>
                     </div>
@@ -1078,7 +1174,7 @@ export default function App() {
                       onClick={() => scrollToSection("contact")}
                       className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs uppercase px-4 py-2.5 rounded tracking-wider text-center"
                     >
-                      Inquire / Pickup Packet
+                      Inquire / Contact Us
                     </button>
                   </div>
                 </div>
@@ -1171,7 +1267,7 @@ export default function App() {
           </div>
 
           <div className="space-y-6">
-            {events.filter((evt: any) => new Date(evt.endDate || evt.date).setHours(23,59,59,999) >= Date.now()).length === 0 ? (
+            {events.filter((evt: any) => parseLocalDate(evt.endDate || evt.date).setHours(23,59,59,999) >= Date.now()).length === 0 ? (
               <div className="bg-slate-50 rounded-2xl p-12 text-center border-2 border-dashed border-slate-200">
                 <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-4" />
                 <h4 className="text-lg font-bold text-slate-700">No Scheduled Events</h4>
@@ -1179,8 +1275,8 @@ export default function App() {
               </div>
             ) : (
               [...events]
-                .filter((evt: any) => new Date(evt.endDate || evt.date).setHours(23,59,59,999) >= Date.now())
-                .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                .filter((evt: any) => parseLocalDate(evt.endDate || evt.date).setHours(23,59,59,999) >= Date.now())
+                .sort((a: any, b: any) => parseLocalDate(a.date).getTime() - parseLocalDate(b.date).getTime())
                 .map((evt: any, idx: number) => (
                 <div
                   key={evt.id}
@@ -1190,10 +1286,10 @@ export default function App() {
                     {/* Date badge matching branding */}
                     <div className="w-16 h-16 bg-neutral-950 text-white rounded-xl flex flex-col items-center justify-center text-center shrink-0 shadow-sm border-b-4 border-red-600">
                       <span className="text-[10px] uppercase font-bold tracking-widest text-red-500 leading-none">
-                        {new Date(evt.date).toLocaleDateString('en-US', { month: 'short' })}
+                        {parseLocalDate(evt.date).toLocaleDateString('en-US', { month: 'short' })}
                       </span>
                       <span className="text-2xl font-black leading-tight mt-0.5">
-                        {new Date(evt.date).toLocaleDateString('en-US', { day: 'numeric' })}
+                        {parseLocalDate(evt.date).toLocaleDateString('en-US', { day: 'numeric' })}
                       </span>
                     </div>
 
@@ -1718,7 +1814,7 @@ export default function App() {
                         <div className="min-w-0">
                           <p className="text-white text-xs font-bold truncate">{evt.title}</p>
                           <p className="text-slate-400 text-[11px] mt-0.5">
-                            {new Date(evt.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            {parseLocalDate(evt.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                             {evt.location ? ` · ${evt.location}` : ''}
                           </p>
                         </div>
