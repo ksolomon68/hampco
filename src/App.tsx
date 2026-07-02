@@ -259,6 +259,33 @@ const DEFAULT_GALLERIES = [
   }
 ];
 
+const DEFAULT_SITE_CONTENT = {
+  // Hero section
+  heroTitle: "Empowering Families. \nBuilding Stronger Communities.",
+  heroSubtitle: "HAMPCO, Inc. is dedicated to acts of socioeconomic elevation, teen mentorship, art nourishment, healthcare outreach, and financial literacy. We serve as a pillar of assistance for high-potential, underserved citizens across our region.",
+  
+  // About section
+  aboutTitle: "An Anti-Poverty Force in Monroe, Louisiana",
+  aboutDesc1: "Helping Assist Multi-Purpose Community Organizations (HAMPCO, Inc.) was established in 1992 and officially incorporated as a 501(c)(3) non-profit organization in 1997.",
+  aboutDesc2: "Our creation was driven by the collaborative vision of Representative Willie Hunter, Jr., who sought a dedicated fiscal agent to manage and monitor state general fund allocations targeting social services and poverty reduction in House Representative District 17.",
+  
+  // Contact details
+  officeHours: "10:00 AM to 2:00 PM",
+  officeDays: "Tuesday, Wednesday, and Thursday",
+  hqAddressLine1: "1116 Jackson Street",
+  hqAddressLine2: "Monroe, LA 71202",
+  mailingAddressLine1: "Post Office Box 4481",
+  mailingAddressLine2: "Monroe, LA 71211-4481",
+  phoneMain: "(318) 361-2025",
+  phoneAlt: "Alt Contacts: (318) 237-0855 / (318) 361-2050",
+  
+  // Scholarships Section
+  scholarshipTitle: "HAMPCO Scholarship Program",
+  scholarshipSubtitle: "Senate District 34",
+  scholarshipDesc: "Every year, Hampco does scholarships to selected deserving high school seniors accepted into a qualified college, university, or technical institution. Applications are vetted by local community volunteers based on academic progress, civic service, and financial necessity.",
+  scholarshipReqsText: "Senior student residing within District 34\nOfficial transcript & proof of college acceptance required"
+};
+
 export default function App() {
   // --- STATE ---
   const [popup, setPopup] = useState(() => {
@@ -288,6 +315,13 @@ export default function App() {
     }
     return DEFAULT_EVENTS;
   });
+
+  const [siteContent, setSiteContent] = useState(() => {
+    const saved = localStorage.getItem('hampco_site_content');
+    return saved ? JSON.parse(saved) : DEFAULT_SITE_CONTENT;
+  });
+
+  const [adminTab, setAdminTab] = useState("events");
 
   const [galleries, setGalleries] = useState(() => {
     const saved = localStorage.getItem('hampco_galleries');
@@ -340,6 +374,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('hampco_galleries', JSON.stringify(galleries));
   }, [galleries]);
+
+  useEffect(() => {
+    localStorage.setItem('hampco_site_content', JSON.stringify(siteContent));
+  }, [siteContent]);
 
   // Trigger popup modal on load if enabled
   useEffect(() => {
@@ -431,9 +469,12 @@ export default function App() {
   };
 
   const handleEditEventClick = (evt) => {
+    setAdminTab("events");
     setEditingEventId(evt.id);
     setNewEvent({ ...evt });
-    scrollToSection("admin-panel");
+    setTimeout(() => {
+      scrollToSection("edit-event-form");
+    }, 100);
   };
 
   const handleDeleteEvent = (id) => {
@@ -791,14 +832,22 @@ export default function App() {
             </div>
 
             <h2 className="hero-fade-2 text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-tight">
-              Empowering Families. <br className="hidden sm:inline" />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-red-400 to-white">
-                Building Stronger Communities.
-              </span>
+              {siteContent.heroTitle.split('\n').map((line, i) => (
+                <React.Fragment key={i}>
+                  {i > 0 && <br className="hidden sm:inline" />}
+                  {i === 1 ? (
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-red-400 to-white">
+                      {line}
+                    </span>
+                  ) : (
+                    line
+                  )}
+                </React.Fragment>
+              ))}
             </h2>
 
             <p className="hero-fade-3 text-base sm:text-lg text-slate-300 max-w-2xl font-light leading-relaxed">
-              HAMPCO, Inc. is dedicated to acts of socioeconomic elevation, teen mentorship, art nourishment, healthcare outreach, and financial literacy. We serve as a pillar of assistance for high-potential, underserved citizens across our region.
+              {siteContent.heroSubtitle}
             </p>
 
             <div className="hero-fade-4 flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4 pt-4">
@@ -907,15 +956,15 @@ export default function App() {
                 Who We Are
               </div>
               <h3 className="text-3xl sm:text-4xl font-black text-neutral-950 leading-tight">
-                An Anti-Poverty Force in Monroe, Louisiana
+                {siteContent.aboutTitle}
               </h3>
               
               <p className="text-slate-600 leading-relaxed text-sm sm:text-base">
-                Helping Assist Multi-Purpose Community Organizations (**HAMPCO, Inc.**) was established in **1992** and officially incorporated as a 501(c)(3) non-profit organization in **1997**. 
+                {siteContent.aboutDesc1}
               </p>
               
               <p className="text-slate-600 leading-relaxed text-sm sm:text-base">
-                Our creation was driven by the collaborative vision of **Representative Willie Hunter, Jr.**, who sought a dedicated fiscal agent to manage and monitor state general fund allocations targeting social services and poverty reduction in House Representative District 17.
+                {siteContent.aboutDesc2}
               </p>
 
               <div className="bg-slate-50 p-6 rounded-2xl border-l-4 border-red-600 space-y-3">
@@ -1152,22 +1201,23 @@ export default function App() {
                 </div>
                 <div className="p-6 md:p-8 md:col-span-7 flex flex-col justify-between space-y-4">
                   <div className="space-y-2.5">
-                    <span className="text-[10px] text-red-600 font-extrabold uppercase tracking-widest">Senate District 34</span>
-                    <h4 className="text-2xl font-black text-slate-950 leading-tight">HAMPCO Scholarship Program</h4>
+                    <span className="text-[10px] text-red-600 font-extrabold uppercase tracking-widest">{siteContent.scholarshipSubtitle}</span>
+                    <h4 className="text-2xl font-black text-slate-950 leading-tight">{siteContent.scholarshipTitle}</h4>
                     <p className="text-xs text-slate-600 leading-relaxed">
-                      Every year, Hampco does scholarships to selected deserving high school seniors accepted into a qualified college, university, or technical institution. Applications are vetted by local community volunteers based on academic progress, civic service, and financial necessity.
+                      {siteContent.scholarshipDesc}
                     </p>
                     <div className="bg-slate-50 p-3 rounded-lg text-xs border border-slate-150">
                       <p className="font-semibold text-slate-800">Requirements & Details:</p>
                       <ul className="list-disc list-inside text-slate-500 mt-1 space-y-0.5">
-                        <li>Senior student residing within District 34</li>
-                        <li>Official transcript & proof of college acceptance required</li>
+                        {siteContent.scholarshipReqsText.split('\n').filter(line => line.trim() !== '').map((req, i) => (
+                          <li key={i}>{req}</li>
+                        ))}
                       </ul>
                     </div>
                   </div>
                   <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
                     <div className="text-xs text-slate-500">
-                      <strong>Office Hours:</strong> Tue-Thu, 10:00 AM - 2:00 PM
+                      <strong>Office Hours:</strong> {siteContent.officeDays}, {siteContent.officeHours}
                     </div>
                     <button 
                       onClick={() => scrollToSection("contact")}
@@ -1297,6 +1347,11 @@ export default function App() {
                         <span className="bg-red-50 text-red-700 text-[10px] font-bold px-2.5 py-0.5 rounded uppercase">
                           {evt.category || "General"}
                         </span>
+                        {evt.endDate && evt.endDate !== evt.date && (
+                          <span className="bg-slate-100 text-slate-700 text-[10px] font-bold px-2.5 py-0.5 rounded uppercase">
+                            Until {parseLocalDate(evt.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </span>
+                        )}
                         <span className="text-xs text-slate-500 flex items-center font-medium">
                           <Clock className="w-3.5 h-3.5 mr-1 text-slate-400" /> {evt.time}
                         </span>
@@ -1500,8 +1555,8 @@ export default function App() {
                   </div>
                   <div>
                     <h4 className="font-extrabold text-slate-900 text-sm">Official Office Hours</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">10:00 AM to 2:00 PM</p>
-                    <p className="text-[11px] text-red-600 font-bold uppercase tracking-wider mt-0.5">Tuesday, Wednesday, and Thursday</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{siteContent.officeHours}</p>
+                    <p className="text-[11px] text-red-600 font-bold uppercase tracking-wider mt-0.5">{siteContent.officeDays}</p>
                   </div>
                 </div>
 
@@ -1512,8 +1567,8 @@ export default function App() {
                   </div>
                   <div>
                     <h4 className="font-extrabold text-slate-900 text-sm">Our Physical HQ Address</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">1116 Jackson Street</p>
-                    <p className="text-xs text-slate-500">Monroe, LA 71202</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{siteContent.hqAddressLine1}</p>
+                    <p className="text-xs text-slate-500">{siteContent.hqAddressLine2}</p>
                   </div>
                 </div>
 
@@ -1524,8 +1579,8 @@ export default function App() {
                   </div>
                   <div>
                     <h4 className="font-extrabold text-slate-900 text-sm">Mailing Address</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">Post Office Box 4481</p>
-                    <p className="text-xs text-slate-500">Monroe, LA 71211-4481</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{siteContent.mailingAddressLine1}</p>
+                    <p className="text-xs text-slate-500">{siteContent.mailingAddressLine2}</p>
                   </div>
                 </div>
 
@@ -1536,8 +1591,8 @@ export default function App() {
                   </div>
                   <div>
                     <h4 className="font-extrabold text-slate-900 text-sm">Phone Assistance</h4>
-                    <p className="text-xs text-slate-700 font-extrabold mt-0.5">(318) 361-2025</p>
-                    <p className="text-xs text-slate-500">Alt Contacts: (318) 237-0855 / (318) 361-2050</p>
+                    <p className="text-xs text-slate-700 font-extrabold mt-0.5">{siteContent.phoneMain}</p>
+                    <p className="text-xs text-slate-500">{siteContent.phoneAlt}</p>
                   </div>
                 </div>
 
@@ -1699,7 +1754,35 @@ export default function App() {
             /* AUTHENTICATED ADMIN DASHBOARD */
             <div className="space-y-12 text-xs sm:text-sm">
               
-              {/* Row 1: Popup customizer */}
+              {/* Tab Selector Bar */}
+              <div className="flex flex-wrap gap-2 border-b border-neutral-800 pb-6 mb-8">
+                {[
+                  { id: "events", label: "Events Manager", icon: Calendar },
+                  { id: "content", label: "Edit Site Content", icon: Edit },
+                  { id: "popup", label: "Alert Popup", icon: Sparkles },
+                  { id: "galleries", label: "Galleries Manager", icon: Layers }
+                ].map((t) => {
+                  const Icon = t.icon;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setAdminTab(t.id)}
+                      className={`flex items-center space-x-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all border ${
+                        adminTab === t.id
+                          ? "bg-red-600 text-white border-red-600 shadow-md shadow-red-600/10"
+                          : "bg-neutral-950 text-slate-400 border-neutral-800 hover:text-white hover:border-neutral-700"
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      <span>{t.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {adminTab === "popup" && (
+              /* Row 1: Popup customizer */
               <div className="bg-neutral-950 p-6 rounded-2xl border border-neutral-800 space-y-6">
                 <div>
                   <h4 className="text-lg font-bold text-white flex items-center">
@@ -1794,7 +1877,10 @@ export default function App() {
 
                 </div>
               </div>
+              )}
 
+              {adminTab === "events" && (
+              <>
               {/* Row 2: Manage / Delete Existing Events */}
               <div className="bg-neutral-950 p-6 rounded-2xl border border-neutral-800 space-y-4">
                 <div>
@@ -1850,7 +1936,7 @@ export default function App() {
               </div>
 
               {/* Row 3: Add / Edit Event Panel */}
-              <div className="bg-neutral-950 p-6 rounded-2xl border border-neutral-800">
+              <div id="edit-event-form" className="bg-neutral-950 p-6 rounded-2xl border border-neutral-800 animate-fadeIn">
                 <div className="mb-6">
                   <h4 className="text-lg font-bold text-white flex items-center">
                     <Plus className="w-5 h-5 mr-2 text-red-500" />
@@ -1860,7 +1946,7 @@ export default function App() {
                 </div>
 
                 <form onSubmit={handleSaveEvent} className="space-y-4 text-xs">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
                       <label className="block text-slate-300 font-bold mb-1">Event Name / Title</label>
                       <input 
@@ -1879,6 +1965,15 @@ export default function App() {
                         required
                         value={newEvent.date}
                         onChange={(e) => setNewEvent(prev => ({ ...prev, date: e.target.value }))}
+                        className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1">Calendar End Date (Optional)</label>
+                      <input 
+                        type="date"
+                        value={newEvent.endDate || ""}
+                        onChange={(e) => setNewEvent(prev => ({ ...prev, endDate: e.target.value }))}
                         className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
                       />
                     </div>
@@ -1956,9 +2051,12 @@ export default function App() {
                   </div>
                 </form>
               </div>
+              </>
+              )}
 
-              {/* Row 3: Manage Multiple Galleries */}
-              <div className="bg-neutral-950 p-6 rounded-2xl border border-neutral-800 space-y-8">
+              {adminTab === "galleries" && (
+              /* Row 3: Manage Multiple Galleries */
+              <div className="bg-neutral-950 p-6 rounded-2xl border border-neutral-800 space-y-8 animate-fadeIn">
 
                 {/* Storage setup notice */}
                 <div className="bg-neutral-900 border border-yellow-600/30 rounded-xl p-4 text-xs text-slate-300 space-y-1">
@@ -2230,6 +2328,225 @@ export default function App() {
                 </div>
 
               </div>
+              )}
+
+              {/* Site Content Customizer Tab */}
+              {adminTab === "content" && (
+                <div className="space-y-6 animate-fadeIn">
+                  <div className="bg-neutral-950 p-6 rounded-2xl border border-neutral-800 space-y-6">
+                    <div>
+                      <h4 className="text-lg font-bold text-white flex items-center">
+                        <Edit className="w-5 h-5 mr-2 text-red-500" />
+                        Edit Site Static Content
+                      </h4>
+                      <p className="text-xs text-slate-400 mt-1">Directly update headings, description text, and contact information across the home page.</p>
+                    </div>
+
+                    <div className="space-y-6 text-xs">
+                      {/* Hero Content Section */}
+                      <div className="border-t border-neutral-900 pt-4 space-y-4">
+                        <h5 className="text-sm font-bold text-red-500 uppercase tracking-wider">Hero Section</h5>
+                        <div className="grid grid-cols-1 gap-4">
+                          <div>
+                            <label className="block text-slate-350 font-semibold mb-1">Hero Heading (Use newlines to break lines)</label>
+                            <textarea
+                              rows={2}
+                              value={siteContent.heroTitle}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, heroTitle: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500 font-semibold"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-350 font-semibold mb-1">Hero Subtitle Text</label>
+                            <textarea
+                              rows={3}
+                              value={siteContent.heroSubtitle}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, heroSubtitle: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* About Content Section */}
+                      <div className="border-t border-neutral-900 pt-4 space-y-4">
+                        <h5 className="text-sm font-bold text-red-500 uppercase tracking-wider">About Us Section</h5>
+                        <div className="grid grid-cols-1 gap-4">
+                          <div>
+                            <label className="block text-slate-350 font-semibold mb-1">About Section Title</label>
+                            <input
+                              type="text"
+                              value={siteContent.aboutTitle}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, aboutTitle: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-350 font-semibold mb-1">About Description Paragraph 1</label>
+                            <textarea
+                              rows={3}
+                              value={siteContent.aboutDesc1}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, aboutDesc1: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-350 font-semibold mb-1">About Description Paragraph 2</label>
+                            <textarea
+                              rows={3}
+                              value={siteContent.aboutDesc2}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, aboutDesc2: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Scholarships Content Section */}
+                      <div className="border-t border-neutral-900 pt-4 space-y-4">
+                        <h5 className="text-sm font-bold text-red-500 uppercase tracking-wider">Scholarships Section</h5>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-slate-350 font-semibold mb-1">Scholarship Card Title</label>
+                            <input
+                              type="text"
+                              value={siteContent.scholarshipTitle}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, scholarshipTitle: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-350 font-semibold mb-1">Scholarship Subheading Badge</label>
+                            <input
+                              type="text"
+                              value={siteContent.scholarshipSubtitle}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, scholarshipSubtitle: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="block text-slate-350 font-semibold mb-1">Scholarship Description Text</label>
+                            <textarea
+                              rows={3}
+                              value={siteContent.scholarshipDesc}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, scholarshipDesc: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="block text-slate-350 font-semibold mb-1">Requirements List (One item per line)</label>
+                            <textarea
+                              rows={3}
+                              value={siteContent.scholarshipReqsText}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, scholarshipReqsText: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Contact Details Section */}
+                      <div className="border-t border-neutral-900 pt-4 space-y-4">
+                        <h5 className="text-sm font-bold text-red-500 uppercase tracking-wider">Contact & Office Hours</h5>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-slate-350 font-semibold mb-1">Office Hours Time</label>
+                            <input
+                              type="text"
+                              value={siteContent.officeHours}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, officeHours: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-350 font-semibold mb-1">Office Days</label>
+                            <input
+                              type="text"
+                              value={siteContent.officeDays}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, officeDays: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-350 font-semibold mb-1">Physical Address Line 1</label>
+                            <input
+                              type="text"
+                              value={siteContent.hqAddressLine1}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, hqAddressLine1: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-350 font-semibold mb-1">Physical Address Line 2</label>
+                            <input
+                              type="text"
+                              value={siteContent.hqAddressLine2}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, hqAddressLine2: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-350 font-semibold mb-1">Mailing Address Line 1</label>
+                            <input
+                              type="text"
+                              value={siteContent.mailingAddressLine1}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, mailingAddressLine1: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-350 font-semibold mb-1">Mailing Address Line 2</label>
+                            <input
+                              type="text"
+                              value={siteContent.mailingAddressLine2}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, mailingAddressLine2: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-350 font-semibold mb-1">Main Office Phone</label>
+                            <input
+                              type="text"
+                              value={siteContent.phoneMain}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, phoneMain: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-350 font-semibold mb-1">Alt Phones / Info</label>
+                            <input
+                              type="text"
+                              value={siteContent.phoneAlt}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, phoneAlt: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Reset to defaults */}
+                      <div className="flex items-center justify-between bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-3 mt-6">
+                        <div>
+                          <p className="text-white text-xs font-bold">Reset Website Content to Default</p>
+                          <p className="text-slate-400 text-[11px] mt-0.5">Replaces current text content with the official defaults.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm("This will replace all edited headings, about text, and contact information with default values. Continue?")) {
+                              setSiteContent(DEFAULT_SITE_CONTENT);
+                            }
+                          }}
+                          className="bg-neutral-800 hover:bg-red-650 text-slate-300 hover:text-white border border-neutral-700 px-4 py-2 rounded text-xs font-bold transition-all"
+                        >
+                          Reset Content
+                        </button>
+                      </div>
+
+                    </div>
+                  </div>
+                </div>
+              )}
 
             </div>
           )}
