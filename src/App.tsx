@@ -977,7 +977,7 @@ export default function App() {
               onClick={() => scrollToSection("scholarships")}
               className="bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-wider shadow-sm transition-all transform hover:-translate-y-0.5 border-b-2 border-red-800"
             >
-              2026 Scholarships
+              Scholarships
             </button>
           </div>
 
@@ -1019,7 +1019,7 @@ export default function App() {
                 onClick={() => scrollToSection("scholarships")}
                 className="w-full text-center bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-bold text-sm uppercase tracking-wider"
               >
-                Apply for 2026 Scholarship
+                Apply for Scholarship
               </button>
             </div>
           </div>
