@@ -36,7 +36,6 @@ import {
   Sliders,
   Handshake,
   Copy,
-  Database,
   RefreshCw,
   Search,
   Filter,
@@ -381,9 +380,7 @@ export default function App() {
   const [contactSuccess, setContactSuccess] = useState(false);
 
   // MySQL Database management & status
-  const [dbStatus, setDbStatus] = useState<string>("Initializing MySQL connection...");
   const [saveStatus, setSaveStatus] = useState<string>("");
-  const [testDbResult, setTestDbResult] = useState<string>("");
   const [contactsList, setContactsList] = useState<any[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
   const isInitialLoadDoneRef = useRef(false);
@@ -404,6 +401,10 @@ export default function App() {
         if (res.ok) {
           setSaveStatus("Saved to MySQL");
           setTimeout(() => setSaveStatus(""), 2500);
+        } else if (res.status === 401) {
+          setAdminAuthenticated(false);
+          setSaveStatus("Session expired. Please log in again.");
+          setTimeout(() => setSaveStatus(""), 4000);
         }
       } catch {
         setSaveStatus("Saved locally");
@@ -426,22 +427,6 @@ export default function App() {
       console.warn("Failed to load contacts:", err);
     } finally {
       setLoadingContacts(false);
-    }
-  };
-
-  const testDbConnection = async () => {
-    setTestDbResult("Connecting to MySQL (hampcoinc_carrie)...");
-    try {
-      const res = await fetch('/api/api.php?action=test');
-      const json = await res.json();
-      if (json.success) {
-        setTestDbResult(`✓ Success! Connected to MySQL\nDatabase: ${json.database}\nVersion: ${json.version}\nMessage: ${json.message}`);
-        setDbStatus("Connected to MySQL (hampcoinc_carrie)");
-      } else {
-        setTestDbResult(`✗ Error: ${json.error || 'Failed to connect.'}`);
-      }
-    } catch (err: any) {
-      setTestDbResult(`Network / Host Status: ${err.message || 'Cannot reach API.'}\nNote: When deployed to cPanel, PHP connects directly to MySQL localhost.`);
     }
   };
 
@@ -508,13 +493,10 @@ export default function App() {
               // First-time database initialization: seed with default data
               syncAllToDatabase();
             }
-            setDbStatus("Connected to MySQL (hampcoinc_carrie)");
           }
         } else {
-          setDbStatus("cPanel MySQL API ready");
         }
       } catch {
-        setDbStatus("Local mode (connects to MySQL on cPanel)");
       } finally {
         isInitialLoadDoneRef.current = true;
       }
@@ -597,18 +579,40 @@ export default function App() {
     }
   };
 
+  // Restore an existing server session when the admin panel is opened
+  useEffect(() => {
+    if (!isAdminMode || adminAuthenticated) return;
+    fetch('/api/api.php?action=session', { credentials: 'same-origin' })
+      .then(r => r.json())
+      .then(j => { if (j && j.authenticated) setAdminAuthenticated(true); })
+      .catch(() => {});
+  }, [isAdminMode]);
+
   // --- ADMIN ACTIONS ---
-  const handleAdminLogin = (e) => {
+  const handleAdminLogin = async (e) => {
     e.preventDefault();
-    if (adminPassword === "admin" || adminPassword === "hampco2026" || adminPassword === "pQm35c?@@e8tS9}q") {
-      setAdminAuthenticated(true);
-      setAdminError("");
-    } else {
-      setAdminError("Invalid authorization code. Use 'admin' or your MySQL key to enter.");
+    setAdminError("");
+    try {
+      const res = await fetch('/api/api.php?action=login', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: adminPassword })
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.success) {
+        setAdminAuthenticated(true);
+        setAdminPassword("");
+      } else {
+        setAdminError(json.error || "Login failed. Please try again.");
+      }
+    } catch {
+      setAdminError("Cannot reach the server. Please try again.");
     }
   };
 
   const handleLogout = () => {
+    fetch('/api/api.php?action=logout', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
     setAdminAuthenticated(false);
     setAdminPassword("");
     setIsAdminMode(false);
@@ -1132,9 +1136,9 @@ export default function App() {
                 
                 <div className="relative h-48 rounded-xl overflow-hidden bg-neutral-900 flex items-center justify-center">
                   <img 
-                    src="favicon.png" 
-                    alt="HAMPCO Favicon Heart Icon"
-                    className="w-28 h-28 object-contain opacity-90 filter drop-shadow-lg"
+                    src="hampco-icon.png" 
+                    alt="HAMPCO heart and hands icon"
+                    className="w-32 h-32 object-contain invert drop-shadow-lg"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&q=80&w=600";
                     }}
@@ -1995,7 +1999,7 @@ export default function App() {
                     type="password" 
                     value={adminPassword}
                     onChange={(e) => setAdminPassword(e.target.value)}
-                    placeholder="Enter key (use 'admin' to test)"
+                    placeholder="Enter admin password"
                     className="w-full px-3.5 py-3 rounded-lg bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500 text-center text-sm font-semibold tracking-widest"
                   />
                 </div>
@@ -2052,8 +2056,7 @@ export default function App() {
                     { id: "galleries", label: "Photo Galleries", icon: Camera, badge: `${galleries.length}` },
                     { id: "content", label: "Site Content", icon: Edit },
                     { id: "popup", label: "Alert Popup", icon: Sparkles, badge: popup.enabled ? "Active" : "Off", badgeColor: popup.enabled ? "bg-red-600 text-white" : "bg-neutral-800 text-slate-400" },
-                    { id: "contacts", label: "Inquiries", icon: Mail, badge: contactsList.length > 0 ? `${contactsList.length}` : undefined },
-                    { id: "database", label: "MySQL Database", icon: Database }
+                    { id: "contacts", label: "Inquiries", icon: Mail, badge: contactsList.length > 0 ? `${contactsList.length}` : undefined }
                   ].map((t) => {
                     const Icon = t.icon;
                     const isActive = adminTab === t.id;
@@ -3172,81 +3175,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* MySQL Database Configuration & Management */}
-              {adminTab === "database" && (
-                <div className="bg-neutral-950 p-6 rounded-2xl border border-neutral-800 space-y-6">
-                  <div>
-                    <h4 className="text-lg font-bold text-white flex items-center">
-                      <Database className="w-5 h-5 text-red-500 mr-2" />
-                      MySQL Database Configuration & Status
-                    </h4>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Persistent relational database connection parameters and synchronization controls.
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="bg-neutral-900 p-4 rounded-xl border border-neutral-800 space-y-1">
-                      <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Host</span>
-                      <p className="text-sm text-white font-mono font-semibold">localhost</p>
-                      <span className="text-[10px] text-slate-500 block">cPanel internal socket</span>
-                    </div>
-
-                    <div className="bg-neutral-900 p-4 rounded-xl border border-neutral-800 space-y-1">
-                      <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Database</span>
-                      <p className="text-sm text-emerald-400 font-mono font-bold">hampcoinc_carrie</p>
-                      <span className="text-[10px] text-slate-500 block">UTF8MB4 Unicode</span>
-                    </div>
-
-                    <div className="bg-neutral-900 p-4 rounded-xl border border-neutral-800 space-y-1">
-                      <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">User</span>
-                      <p className="text-sm text-white font-mono font-semibold">hampcoinc_keisha</p>
-                      <span className="text-[10px] text-slate-500 block">Full schema privileges</span>
-                    </div>
-
-                    <div className="bg-neutral-900 p-4 rounded-xl border border-neutral-800 space-y-1">
-                      <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Live Status</span>
-                      <p className="text-xs text-amber-400 font-medium truncate" title={dbStatus}>{dbStatus}</p>
-                      <span className="text-[10px] text-slate-500 block">Status monitor</span>
-                    </div>
-                  </div>
-
-                  <div className="bg-neutral-900 p-5 rounded-xl border border-neutral-800 space-y-4">
-                    <h5 className="text-xs font-bold text-white uppercase tracking-wider">Database Operations</h5>
-                    <div className="flex flex-wrap gap-3">
-                      <button
-                        type="button"
-                        onClick={testDbConnection}
-                        className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2.5 rounded text-xs transition-all shadow-md"
-                      >
-                        Test Database Connection
-                      </button>
-                      <button
-                        type="button"
-                        onClick={syncAllToDatabase}
-                        className="bg-neutral-800 hover:bg-neutral-700 text-slate-300 hover:text-white border border-neutral-700 font-bold px-4 py-2.5 rounded text-xs transition-all"
-                      >
-                        Push All Current Data to MySQL
-                      </button>
-                    </div>
-
-                    {testDbResult && (
-                      <div className="p-3.5 rounded-lg bg-neutral-950 border border-neutral-800 text-xs text-slate-300 font-mono whitespace-pre-wrap leading-relaxed">
-                        {testDbResult}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-neutral-900/50 border border-neutral-800 text-xs text-slate-400 space-y-2">
-                    <p className="font-semibold text-slate-300">Managed MySQL Tables:</p>
-                    <ul className="list-disc list-inside space-y-1 text-[11px] text-slate-400 font-mono">
-                      <li><strong className="text-slate-200">hampco_site_data</strong>: JSON key-value persistence for popup, events, galleries, and site text.</li>
-                      <li><strong className="text-slate-200">hampco_contacts</strong>: Records incoming inquiries from the community contact form.</li>
-                    </ul>
-                  </div>
-                </div>
-              )}
-
             </div>
           )}
 
@@ -3261,9 +3189,9 @@ export default function App() {
           <div className="md:col-span-4 space-y-4">
             <div className="flex items-center space-x-3">
               <img 
-                src="ico-128x119.png" 
-                alt="Favicon Heart" 
-                className="w-8 h-8 object-contain"
+                src="hampco-icon.png" 
+                alt="HAMPCO heart and hands icon" 
+                className="w-9 h-9 object-contain invert"
                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
               />
               <div>

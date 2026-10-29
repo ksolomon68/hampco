@@ -1,16 +1,30 @@
 <?php
 /**
- * HAMPCO MySQL Database Configuration
- * Database: hampcoinc_carrie
- * User: hampcoinc_keisha
+ * HAMPCO configuration.
+ * No passwords live in this file. Secrets are loaded from a file that sits
+ * OUTSIDE public_html and outside git:
+ *
+ *   /home/hampcoinc/hampco-secrets.php
+ *
+ * That file returns an array with two keys: 'db_pass' and 'admin_hash'.
  */
 
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'hampcoinc_carrie');
 define('DB_USER', 'hampcoinc_keisha');
-define('DB_PASS', 'pQm35c?@@e8tS9}q');
 define('DB_CHARSET', 'utf8mb4');
-define('NOTIFICATION_EMAIL', 'carrie.simon.hampco@gmail.com');
+
+$hampcoSecrets = [];
+$hampcoSecretsFile = dirname(__DIR__, 2) . '/hampco-secrets.php';
+if (is_readable($hampcoSecretsFile)) {
+    $loaded = require $hampcoSecretsFile;
+    if (is_array($loaded)) {
+        $hampcoSecrets = $loaded;
+    }
+}
+define('DB_PASS', (string) ($hampcoSecrets['db_pass'] ?? ''));
+define('ADMIN_PASSWORD_HASH', (string) ($hampcoSecrets['admin_hash'] ?? ''));
+unset($hampcoSecrets, $hampcoSecretsFile, $loaded);
 
 function getDbConnection() {
     static $pdo = null;
@@ -27,7 +41,7 @@ function getDbConnection() {
             http_response_code(500);
             echo json_encode([
                 'success' => false,
-                'error' => 'Database connection failed: ' . $e->getMessage()
+                'error' => 'Database connection failed.'
             ]);
             exit;
         }

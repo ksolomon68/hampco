@@ -5,9 +5,8 @@
  */
 
 header('Content-Type: application/json; charset=UTF-8');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+header('X-Content-Type-Options: nosniff');
+header('Cache-Control: no-store');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -18,6 +17,68 @@ require_once __DIR__ . '/config.php';
 
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 
+// ---------------------------------------------------------------
+// Admin authentication (server-side session, bcrypt hash stored
+// outside public_html in /home/<user>/hampco-secrets.php)
+// ---------------------------------------------------------------
+const ADMIN_SESSION_SECONDS = 8 * 3600;
+const LOGIN_MAX_FAILURES = 5;
+const LOGIN_WINDOW_SECONDS = 900;
+
+function startAdminSession() {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_name('hampco_admin');
+        session_set_cookie_params([
+            'lifetime' => 0,
+            'path' => '/',
+            'secure' => !empty($_SERVER['HTTPS']),
+            'httponly' => true,
+            'samesite' => 'Lax'
+        ]);
+        session_start();
+    }
+}
+
+function isAdmin() {
+    startAdminSession();
+    return !empty($_SESSION['hampco_admin']) && ($_SESSION['hampco_expires'] ?? 0) > time();
+}
+
+function requireAdmin() {
+    if (!isAdmin()) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'Admin login required.']);
+        exit;
+    }
+}
+
+function loginThrottleFile() {
+    $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    return sys_get_temp_dir() . '/hampco_login_' . md5($ip) . '.json';
+}
+
+function loginFailures() {
+    $file = loginThrottleFile();
+    if (!is_file($file)) return 0;
+    $data = json_decode((string) @file_get_contents($file), true);
+    if (!is_array($data) || ($data['since'] ?? 0) < time() - LOGIN_WINDOW_SECONDS) return 0;
+    return (int) ($data['count'] ?? 0);
+}
+
+function recordLoginFailure() {
+    $file = loginThrottleFile();
+    $data = json_decode((string) @file_get_contents($file), true);
+    if (!is_array($data) || ($data['since'] ?? 0) < time() - LOGIN_WINDOW_SECONDS) {
+        $data = ['since' => time(), 'count' => 0];
+    }
+    $data['count']++;
+    @file_put_contents($file, json_encode($data), LOCK_EX);
+}
+
+function clearLoginFailures() {
+    @unlink(loginThrottleFile());
+}
+
 try {
     $pdo = getDbConnection();
     initDatabaseSchema($pdo);
@@ -25,13 +86,58 @@ try {
     http_response_code(500);
     echo json_encode([
         'success' => false,
-        'error' => 'Database connection/initialization failed: ' . $e->getMessage()
+        'error' => 'Database connection/initialization failed.'
     ]);
     exit;
 }
 
 switch ($action) {
+    case 'login':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['success' => false, 'error' => 'POST required.']);
+            exit;
+        }
+        if (!defined('ADMIN_PASSWORD_HASH') || ADMIN_PASSWORD_HASH === '') {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Admin login is not configured on the server.']);
+            exit;
+        }
+        if (loginFailures() >= LOGIN_MAX_FAILURES) {
+            http_response_code(429);
+            echo json_encode(['success' => false, 'error' => 'Too many attempts. Please wait 15 minutes and try again.']);
+            exit;
+        }
+        $payload = json_decode(file_get_contents('php://input'), true);
+        $password = is_array($payload) ? (string) ($payload['password'] ?? '') : '';
+        if ($password !== '' && password_verify($password, ADMIN_PASSWORD_HASH)) {
+            startAdminSession();
+            session_regenerate_id(true);
+            $_SESSION['hampco_admin'] = true;
+            $_SESSION['hampco_expires'] = time() + ADMIN_SESSION_SECONDS;
+            clearLoginFailures();
+            echo json_encode(['success' => true]);
+        } else {
+            recordLoginFailure();
+            usleep(600000);
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Invalid password.']);
+        }
+        break;
+
+    case 'logout':
+        startAdminSession();
+        $_SESSION = [];
+        session_destroy();
+        echo json_encode(['success' => true]);
+        break;
+
+    case 'session':
+        echo json_encode(['success' => true, 'authenticated' => isAdmin()]);
+        break;
+
     case 'test':
+        requireAdmin();
         try {
             $stmt = $pdo->query("SELECT DATABASE() as db, VERSION() as version");
             $info = $stmt->fetch();
@@ -73,6 +179,7 @@ switch ($action) {
         break;
 
     case 'save_section':
+        requireAdmin();
         $rawInput = file_get_contents('php://input');
         $payload = json_decode($rawInput, true);
 
@@ -204,7 +311,7 @@ switch ($action) {
             <body>
               <div class='card'>
                 <div class='header'>
-                  <h2>HAMPCO, Inc. — New Website Inquiry</h2>
+                  <h2>HAMPCO, Inc.: New Website Inquiry</h2>
                   <p>Received {$submittedAt}</p>
                 </div>
                 <div class='content'>
@@ -245,12 +352,13 @@ switch ($action) {
             http_response_code(500);
             echo json_encode([
                 'success' => false,
-                'error' => 'Failed to record inquiry: ' . $e->getMessage()
+                'error' => 'Failed to record inquiry.'
             ]);
         }
         break;
 
     case 'get_contacts':
+        requireAdmin();
         try {
             $stmt = $pdo->query("SELECT * FROM `hampco_contacts` ORDER BY `created_at` DESC LIMIT 100");
             $contacts = $stmt->fetchAll();
@@ -268,6 +376,7 @@ switch ($action) {
         break;
 
     case 'upload':
+        requireAdmin();
         if (!isset($_FILES['file'])) {
             http_response_code(400);
             echo json_encode([
@@ -336,9 +445,7 @@ switch ($action) {
     default:
         echo json_encode([
             'success' => true,
-            'message' => 'HAMPCO API is online.',
-            'database' => DB_NAME,
-            'user' => DB_USER
+            'message' => 'HAMPCO API is online.'
         ]);
         break;
 }
