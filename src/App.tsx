@@ -35,7 +35,14 @@ import {
   LogOut,
   Sliders,
   Handshake,
-  Copy
+  Copy,
+  Database,
+  RefreshCw,
+  Search,
+  Filter,
+  Globe,
+  ChevronDown,
+  ExternalLink
 } from 'lucide-react';
 
 const supabase = createClient(
@@ -278,6 +285,7 @@ const DEFAULT_SITE_CONTENT = {
   mailingAddressLine2: "Monroe, LA 71211-4481",
   phoneMain: "(318) 361-2025",
   phoneAlt: "Alt Contacts: (318) 237-0855 / (318) 361-2050",
+  contactEmail: "carrie.simon.hampco@gmail.com",
   
   // Scholarships Section
   scholarshipTitle: "HAMPCO Scholarship Program",
@@ -358,25 +366,190 @@ export default function App() {
   const [editingImage, setEditingImage] = useState<{ galleryId: string; imageId: string; title: string; url: string } | null>(null);
   const [expandedGalleryId, setExpandedGalleryId] = useState<string>("");
 
+  // CMS Organization & Productivity State
+  const [contentSubTab, setContentSubTab] = useState<"hero" | "about" | "scholarship" | "contact">("hero");
+  const [eventSearchQuery, setEventSearchQuery] = useState("");
+  const [eventCategoryFilter, setEventCategoryFilter] = useState("All");
+  const [isEventFormOpen, setIsEventFormOpen] = useState(false);
+  const [selectedAdminGalleryId, setSelectedAdminGalleryId] = useState<string>("g1");
+  const [isNewGalleryModalOpen, setIsNewGalleryModalOpen] = useState(false);
+  const [contactsSearchQuery, setContactsSearchQuery] = useState("");
+  const [isAddingPhoto, setIsAddingPhoto] = useState(false);
+
   // Contact form submission feedback
   const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", message: "" });
   const [contactSuccess, setContactSuccess] = useState(false);
 
+  // MySQL Database management & status
+  const [dbStatus, setDbStatus] = useState<string>("Initializing MySQL connection...");
+  const [saveStatus, setSaveStatus] = useState<string>("");
+  const [testDbResult, setTestDbResult] = useState<string>("");
+  const [contactsList, setContactsList] = useState<any[]>([]);
+  const [loadingContacts, setLoadingContacts] = useState(false);
+  const isInitialLoadDoneRef = useRef(false);
+  const saveTimeoutRef = useRef<{ [key: string]: any }>({});
+
+  const saveSectionToDb = (section: string, data: any) => {
+    if (saveTimeoutRef.current[section]) {
+      clearTimeout(saveTimeoutRef.current[section]);
+    }
+    setSaveStatus("Saving changes to MySQL...");
+    saveTimeoutRef.current[section] = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/api.php?action=save_section', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ section, data })
+        });
+        if (res.ok) {
+          setSaveStatus("Saved to MySQL");
+          setTimeout(() => setSaveStatus(""), 2500);
+        }
+      } catch {
+        setSaveStatus("Saved locally");
+        setTimeout(() => setSaveStatus(""), 2500);
+      }
+    }, 400);
+  };
+
+  const loadContacts = async () => {
+    setLoadingContacts(true);
+    try {
+      const res = await fetch('/api/api.php?action=get_contacts');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success) {
+          setContactsList(json.contacts || []);
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to load contacts:", err);
+    } finally {
+      setLoadingContacts(false);
+    }
+  };
+
+  const testDbConnection = async () => {
+    setTestDbResult("Connecting to MySQL (hampcoinc_carrie)...");
+    try {
+      const res = await fetch('/api/api.php?action=test');
+      const json = await res.json();
+      if (json.success) {
+        setTestDbResult(`✓ Success! Connected to MySQL\nDatabase: ${json.database}\nVersion: ${json.version}\nMessage: ${json.message}`);
+        setDbStatus("Connected to MySQL (hampcoinc_carrie)");
+      } else {
+        setTestDbResult(`✗ Error: ${json.error || 'Failed to connect.'}`);
+      }
+    } catch (err: any) {
+      setTestDbResult(`Network / Host Status: ${err.message || 'Cannot reach API.'}\nNote: When deployed to cPanel, PHP connects directly to MySQL localhost.`);
+    }
+  };
+
+  const syncAllToDatabase = async () => {
+    setSaveStatus("Syncing all content to MySQL...");
+    try {
+      await Promise.all([
+        fetch('/api/api.php?action=save_section', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ section: 'popup', data: popup })
+        }),
+        fetch('/api/api.php?action=save_section', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ section: 'events', data: events })
+        }),
+        fetch('/api/api.php?action=save_section', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ section: 'galleries', data: galleries })
+        }),
+        fetch('/api/api.php?action=save_section', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ section: 'site_content', data: siteContent })
+        })
+      ]);
+      setSaveStatus("All sections synced to MySQL!");
+      setTimeout(() => setSaveStatus(""), 3500);
+    } catch {
+      setSaveStatus("Failed to sync to database");
+      setTimeout(() => setSaveStatus(""), 3500);
+    }
+  };
+
+  // Initial load from MySQL database
+  useEffect(() => {
+    const loadFromDb = async () => {
+      try {
+        const res = await fetch('/api/api.php?action=get_all');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data) {
+            let hasExistingData = false;
+            if (json.data.popup) {
+              setPopup(json.data.popup);
+              hasExistingData = true;
+            }
+            if (json.data.events) {
+              setEvents(json.data.events);
+              hasExistingData = true;
+            }
+            if (json.data.galleries) {
+              setGalleries(json.data.galleries);
+              hasExistingData = true;
+            }
+            if (json.data.site_content) {
+              setSiteContent(json.data.site_content);
+              hasExistingData = true;
+            }
+
+            if (!hasExistingData) {
+              // First-time database initialization: seed with default data
+              syncAllToDatabase();
+            }
+            setDbStatus("Connected to MySQL (hampcoinc_carrie)");
+          }
+        } else {
+          setDbStatus("cPanel MySQL API ready");
+        }
+      } catch {
+        setDbStatus("Local mode (connects to MySQL on cPanel)");
+      } finally {
+        isInitialLoadDoneRef.current = true;
+      }
+    };
+
+    loadFromDb();
+  }, []);
+
   // --- PERSISTENCE EFFECT ---
   useEffect(() => {
     localStorage.setItem('hampco_popup', JSON.stringify(popup));
+    if (isInitialLoadDoneRef.current) {
+      saveSectionToDb('popup', popup);
+    }
   }, [popup]);
 
   useEffect(() => {
     localStorage.setItem('hampco_events', JSON.stringify(events));
+    if (isInitialLoadDoneRef.current) {
+      saveSectionToDb('events', events);
+    }
   }, [events]);
 
   useEffect(() => {
     localStorage.setItem('hampco_galleries', JSON.stringify(galleries));
+    if (isInitialLoadDoneRef.current) {
+      saveSectionToDb('galleries', galleries);
+    }
   }, [galleries]);
 
   useEffect(() => {
     localStorage.setItem('hampco_site_content', JSON.stringify(siteContent));
+    if (isInitialLoadDoneRef.current) {
+      saveSectionToDb('site_content', siteContent);
+    }
   }, [siteContent]);
 
   // Trigger popup modal on load if enabled
@@ -427,11 +600,11 @@ export default function App() {
   // --- ADMIN ACTIONS ---
   const handleAdminLogin = (e) => {
     e.preventDefault();
-    if (adminPassword === "admin" || adminPassword === "hampco2026") {
+    if (adminPassword === "admin" || adminPassword === "hampco2026" || adminPassword === "pQm35c?@@e8tS9}q") {
       setAdminAuthenticated(true);
       setAdminError("");
     } else {
-      setAdminError("Invalid authorization code. Use 'admin' to try the system.");
+      setAdminError("Invalid authorization code. Use 'admin' or your MySQL key to enter.");
     }
   };
 
@@ -464,16 +637,18 @@ export default function App() {
       setEvents(prev => [added, ...prev]);
     }
 
-    // Reset fields
+    // Reset fields & close form
     setNewEvent({ title: "", date: "", endDate: "", time: "", location: "", description: "", category: "General" });
+    setIsEventFormOpen(false);
   };
 
   const handleEditEventClick = (evt) => {
     setAdminTab("events");
     setEditingEventId(evt.id);
     setNewEvent({ ...evt });
+    setIsEventFormOpen(true);
     setTimeout(() => {
-      scrollToSection("edit-event-form");
+      document.getElementById("edit-event-form")?.scrollIntoView({ behavior: 'smooth' });
     }, 100);
   };
 
@@ -509,13 +684,21 @@ export default function App() {
       images: []
     };
     setGalleries(prev => [...prev, addedGallery]);
+    setSelectedAdminGalleryId(addedGallery.id);
     setActiveAdminGalleryId(addedGallery.id);
     setNewGallery({ title: "", description: "", coverImage: "" });
+    setIsNewGalleryModalOpen(false);
   };
 
   const handleDeleteGallery = (id) => {
     if (confirm("Are you sure you want to delete this entire gallery?")) {
-      setGalleries(prev => prev.filter(g => g.id !== id));
+      setGalleries(prev => {
+        const next = prev.filter(g => g.id !== id);
+        if (selectedAdminGalleryId === id) {
+          setSelectedAdminGalleryId(next[0]?.id || "");
+        }
+        return next;
+      });
       if (selectedGalleryId === id) setSelectedGalleryId("all");
       if (activeAdminGalleryId === id) setActiveAdminGalleryId("");
     }
@@ -572,9 +755,18 @@ export default function App() {
     }
   };
 
-  const handleContactSubmit = (e) => {
+  const handleContactSubmit = async (e) => {
     e.preventDefault();
     setContactSuccess(true);
+    try {
+      await fetch('/api/api.php?action=contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(contactForm)
+      });
+    } catch (err) {
+      console.warn("Contact form database submission error:", err);
+    }
     setContactForm({ name: "", email: "", phone: "", message: "" });
     setTimeout(() => {
       setContactSuccess(false);
@@ -582,13 +774,30 @@ export default function App() {
   };
 
   const handleFileUpload = async (file: File): Promise<string | null> => {
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-    const path = `gallery/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-
     setUploadingImage(true);
     setUploadError("");
 
+    // Try native cPanel PHP file upload first
     try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/api.php?action=upload', {
+        method: 'POST',
+        body: formData
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.url) {
+          return json.url;
+        }
+      }
+    } catch {
+      // Fallback to Supabase if PHP upload isn't reachable
+    }
+
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const path = `gallery/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
       const { data, error } = await supabase.storage
         .from('gallery-images')
         .upload(path, file, { cacheControl: '3600', upsert: false });
@@ -596,7 +805,7 @@ export default function App() {
       if (error) {
         setUploadError(
           error.message.toLowerCase().includes('bucket')
-            ? 'Storage not configured. Create a public bucket named "gallery-images" in your Supabase dashboard, then enable public uploads under Storage > Policies.'
+            ? 'Storage not configured. Upload directly on cPanel or configure Supabase storage.'
             : `Upload failed: ${error.message}`
         );
         return null;
@@ -608,7 +817,7 @@ export default function App() {
 
       return publicUrl;
     } catch {
-      setUploadError("Upload failed. Please check your internet connection and Supabase storage setup.");
+      setUploadError("Upload failed. Please check your internet connection.");
       return null;
     } finally {
       setUploadingImage(false);
@@ -649,6 +858,33 @@ export default function App() {
     }
   };
 
+  // CMS Filtered datasets
+  const filteredEvents = events.filter((evt: any) => {
+    const q = eventSearchQuery.toLowerCase();
+    const matchesSearch = !eventSearchQuery || 
+      (evt.title && evt.title.toLowerCase().includes(q)) ||
+      (evt.location && evt.location.toLowerCase().includes(q)) ||
+      (evt.description && evt.description.toLowerCase().includes(q));
+    const matchesCat = eventCategoryFilter === "All" || evt.category === eventCategoryFilter;
+    return matchesSearch && matchesCat;
+  });
+
+  const filteredContacts = contactsList.filter((c: any) => {
+    if (!contactsSearchQuery) return true;
+    const q = contactsSearchQuery.toLowerCase();
+    return (c.name && c.name.toLowerCase().includes(q)) ||
+           (c.email && c.email.toLowerCase().includes(q)) ||
+           (c.message && c.message.toLowerCase().includes(q));
+  });
+
+  const currentAdminGallery = galleries.find(g => g.id === selectedAdminGalleryId) || galleries[0] || {
+    id: "g1",
+    title: "Default Gallery",
+    description: "",
+    coverImage: "",
+    images: []
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col selection:bg-red-600 selection:text-white">
       
@@ -680,9 +916,9 @@ export default function App() {
           <div className="flex items-center space-x-3 cursor-pointer" onClick={() => scrollToSection("home")}>
             <div className="relative group">
               <img 
-                src="hampco-logo-128x38.png" 
-                alt="HAMPCO, Inc. Logo" 
-                className="h-12 sm:h-14 md:h-16 object-contain transition-transform group-hover:scale-102"
+                src="hampco-logo.png" 
+                alt="HAMPCO, Inc. - Building Stronger Communities" 
+                className="h-12 sm:h-14 md:h-16 w-auto object-contain transition-transform group-hover:scale-102"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = 'none';
                   const fallbackEl = document.getElementById('brand-fallback');
@@ -1596,6 +1832,23 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Email Contact */}
+                <div className="flex items-start space-x-4">
+                  <div className="w-10 h-10 rounded bg-red-50 text-red-600 flex items-center justify-center shrink-0 border border-red-100">
+                    <Mail className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-slate-900 text-sm">Direct Email</h4>
+                    <a
+                      href={`mailto:${siteContent.contactEmail || 'carrie.simon.hampco@gmail.com'}`}
+                      className="text-xs text-red-600 font-extrabold mt-0.5 hover:underline block"
+                    >
+                      {siteContent.contactEmail || 'carrie.simon.hampco@gmail.com'}
+                    </a>
+                    <p className="text-xs text-slate-500">All website inquiries routed to Carrie Simon</p>
+                  </div>
+                </div>
+
               </div>
 
               {/* Decorative map representation */}
@@ -1609,14 +1862,16 @@ export default function App() {
             {/* Form Column */}
             <div className="reveal-right lg:col-span-7 bg-slate-50 p-6 sm:p-8 rounded-2xl border border-slate-200">
               <h4 className="text-xl font-bold text-slate-900 mb-2">Send HAMPCO An Email Inquiry</h4>
-              <p className="text-xs text-slate-500 mb-6">Fill in details below to directly email our administration team regarding sponsorships, student art entry, or scholarships.</p>
+              <p className="text-xs text-slate-500 mb-6">Inquiries are sent directly to Carrie Simon at <strong className="text-slate-700">carrie.simon.hampco@gmail.com</strong>.</p>
               
               {contactSuccess ? (
                 <div className="bg-red-50 text-red-900 p-6 rounded-xl border border-red-200 flex items-start space-x-3 animate-fadeIn">
                   <Check className="w-6 h-6 text-red-600 shrink-0 mt-0.5" />
                   <div>
-                    <h5 className="font-bold text-sm">Message Successfully Submitted!</h5>
-                    <p className="text-xs text-red-800 mt-1">Thank you for contacting HAMPCO, Inc. Our executive director will review your query and reply during official working hours (Tue-Thu).</p>
+                    <h5 className="font-bold text-sm">Inquiry Dispatched!</h5>
+                    <p className="text-xs text-red-800 mt-1">
+                      Thank you for reaching out! Your message has been delivered to <strong>carrie.simon.hampco@gmail.com</strong> and archived. We will review and reply during working hours.
+                    </p>
                   </div>
                 </div>
               ) : (
@@ -1701,13 +1956,20 @@ export default function App() {
             </div>
             
             {adminAuthenticated ? (
-              <button 
-                onClick={handleLogout}
-                className="bg-neutral-800 hover:bg-neutral-700 text-slate-300 border border-neutral-700 px-4 py-2 rounded text-xs font-bold flex items-center space-x-1.5 transition-all"
-              >
-                <LogOut className="w-4 h-4 text-red-500" />
-                <span>Exit Admin Customizer</span>
-              </button>
+              <div className="flex items-center space-x-3">
+                <div className="hidden sm:flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800 text-xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span className="text-slate-400 font-medium">MySQL:</span>
+                  <span className="text-emerald-400 font-mono font-bold">hampcoinc_carrie</span>
+                </div>
+                <button 
+                  onClick={handleLogout}
+                  className="bg-neutral-800 hover:bg-neutral-700 text-slate-300 border border-neutral-700 px-4 py-2 rounded text-xs font-bold flex items-center space-x-1.5 transition-all"
+                >
+                  <LogOut className="w-4 h-4 text-red-500" />
+                  <span>Exit Admin Customizer</span>
+                </button>
+              </div>
             ) : (
               <span className="bg-neutral-950 text-slate-400 text-xs px-3 py-1 rounded border border-neutral-800">
                 Secure Live Edits Mode
@@ -1752,798 +2014,1235 @@ export default function App() {
             </div>
           ) : (
             /* AUTHENTICATED ADMIN DASHBOARD */
-            <div className="space-y-12 text-xs sm:text-sm">
+            <div className="space-y-8 text-xs sm:text-sm">
               
-              {/* Tab Selector Bar */}
-              <div className="flex flex-wrap gap-2 border-b border-neutral-800 pb-6 mb-8">
-                {[
-                  { id: "events", label: "Events Manager", icon: Calendar },
-                  { id: "content", label: "Edit Site Content", icon: Edit },
-                  { id: "popup", label: "Alert Popup", icon: Sparkles },
-                  { id: "galleries", label: "Galleries Manager", icon: Layers }
-                ].map((t) => {
-                  const Icon = t.icon;
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => setAdminTab(t.id)}
-                      className={`flex items-center space-x-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all border ${
-                        adminTab === t.id
-                          ? "bg-red-600 text-white border-red-600 shadow-md shadow-red-600/10"
-                          : "bg-neutral-950 text-slate-400 border-neutral-800 hover:text-white hover:border-neutral-700"
-                      }`}
-                    >
-                      <Icon className="w-4 h-4" />
-                      <span>{t.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {adminTab === "popup" && (
-              /* Row 1: Popup customizer */
-              <div className="bg-neutral-950 p-6 rounded-2xl border border-neutral-800 space-y-6">
-                <div>
-                  <h4 className="text-lg font-bold text-white flex items-center">
-                    <span className="w-2.5 h-2.5 bg-red-500 rounded-full mr-2.5 animate-pulse"></span>
-                    Custom Alert Popup Controller
-                  </h4>
-                  <p className="text-xs text-slate-400 mt-1">Configure the announcement banner/popup shown to all home page visitors instantly.</p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                  
-                  {/* Left toggles */}
-                  <div className="md:col-span-4 space-y-4">
-                    <div className="bg-neutral-900 p-4 rounded-xl border border-neutral-800 space-y-3">
-                      <label className="flex items-center space-x-2 cursor-pointer font-bold text-white">
-                        <input 
-                          type="checkbox"
-                          checked={popup.enabled}
-                          onChange={(e) => updatePopupConfig('enabled', e.target.checked)}
-                          className="rounded text-red-600 bg-neutral-950 border-neutral-700 w-4 h-4 focus:ring-0"
-                        />
-                        <span>Enable Popup Alert</span>
-                      </label>
-                      <p className="text-[11px] text-slate-400">If checked, a premium dialog popup will immediately trigger upon user visit.</p>
-                    </div>
-
-                    <div className="bg-neutral-900 p-4 rounded-xl border border-neutral-800 space-y-2">
-                      <label className="block text-slate-300 font-bold mb-1">Color Theme</label>
-                      <div className="grid grid-cols-4 gap-2">
-                        {['red', 'black', 'blue', 'slate'].map((col) => (
-                          <button
-                            key={col}
-                            type="button"
-                            onClick={() => updatePopupConfig('bgColor', col)}
-                            className={`py-1.5 rounded uppercase text-[9px] font-black tracking-widest transition-all ${
-                              popup.bgColor === col 
-                                ? 'bg-red-600 text-white' 
-                                : 'bg-neutral-850 text-slate-400 hover:text-white'
-                            }`}
-                          >
-                            {col}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right text inputs */}
-                  <div className="md:col-span-8 space-y-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-slate-300 font-medium mb-1">Popup Banner Title</label>
-                        <input 
-                          type="text"
-                          value={popup.title}
-                          onChange={(e) => updatePopupConfig('title', e.target.value)}
-                          className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-slate-300 font-medium mb-1">Button Call-to-Action Link</label>
-                        <input 
-                          type="text"
-                          value={popup.buttonLink}
-                          onChange={(e) => updatePopupConfig('buttonLink', e.target.value)}
-                          placeholder="#scholarships"
-                          className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-slate-300 font-medium mb-1">Popup Banner Button Text</label>
-                      <input 
-                        type="text"
-                        value={popup.buttonText}
-                        onChange={(e) => updatePopupConfig('buttonText', e.target.value)}
-                        className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-slate-300 font-medium mb-1">Main Announcement Body Content Text</label>
-                      <textarea
-                        rows={3}
-                        value={popup.message}
-                        onChange={(e) => updatePopupConfig('message', e.target.value)}
-                        className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                      ></textarea>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-              )}
-
-              {adminTab === "events" && (
-              <>
-              {/* Row 2: Manage / Delete Existing Events */}
-              <div className="bg-neutral-950 p-6 rounded-2xl border border-neutral-800 space-y-4">
-                <div>
-                  <h4 className="text-lg font-bold text-white flex items-center">
-                    <Calendar className="w-5 h-5 mr-2 text-red-500" />
-                    Manage Existing Events
-                  </h4>
-                  <p className="text-xs text-slate-400 mt-1">Edit or remove events from the community calendar.</p>
-                </div>
-                {events.length === 0 ? (
-                  <p className="text-slate-500 text-xs italic">No events on the calendar yet.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {events.map((evt: { id: string; title: string; date: string; location?: string }) => (
-                      <div key={evt.id} className="flex items-center justify-between bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-3 gap-3">
-                        <div className="min-w-0">
-                          <p className="text-white text-xs font-bold truncate">{evt.title}</p>
-                          <p className="text-slate-400 text-[11px] mt-0.5">
-                            {parseLocalDate(evt.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                            {evt.location ? ` · ${evt.location}` : ''}
-                          </p>
-                        </div>
-                        <div className="flex items-center space-x-2 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => handleDuplicateEvent(evt)}
-                            className="p-2 bg-neutral-800 hover:bg-neutral-700 text-sky-400 rounded border border-neutral-700 transition-all"
-                            title="Duplicate"
-                          >
-                            <Copy className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleEditEventClick(evt)}
-                            className="p-2 bg-neutral-800 hover:bg-neutral-700 text-amber-400 rounded border border-neutral-700 transition-all"
-                            title="Edit"
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteEvent(evt.id)}
-                            className="p-2 bg-red-600 hover:bg-red-700 text-white rounded transition-all"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Row 3: Add / Edit Event Panel */}
-              <div id="edit-event-form" className="bg-neutral-950 p-6 rounded-2xl border border-neutral-800 animate-fadeIn">
-                <div className="mb-6">
-                  <h4 className="text-lg font-bold text-white flex items-center">
-                    <Plus className="w-5 h-5 mr-2 text-red-500" />
-                    {editingEventId ? "Update / Edit Existing Event" : "Create & Publish Brand New Event"}
-                  </h4>
-                  <p className="text-xs text-slate-400 mt-1">Fill the form to append classes, fundraisers, and board meetings immediately to the community feed.</p>
-                </div>
-
-                <form onSubmit={handleSaveEvent} className="space-y-4 text-xs">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                      <label className="block text-slate-300 font-bold mb-1">Event Name / Title</label>
-                      <input 
-                        type="text"
-                        required
-                        value={newEvent.title}
-                        onChange={(e) => setNewEvent(prev => ({ ...prev, title: e.target.value }))}
-                        placeholder="Summer Cooking 101"
-                        className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-300 font-bold mb-1">Calendar Start Date</label>
-                      <input 
-                        type="date"
-                        required
-                        value={newEvent.date}
-                        onChange={(e) => setNewEvent(prev => ({ ...prev, date: e.target.value }))}
-                        className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-300 font-bold mb-1">Calendar End Date (Optional)</label>
-                      <input 
-                        type="date"
-                        value={newEvent.endDate || ""}
-                        onChange={(e) => setNewEvent(prev => ({ ...prev, endDate: e.target.value }))}
-                        className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-300 font-bold mb-1">Time Range</label>
-                      <input 
-                        type="text"
-                        value={newEvent.time}
-                        onChange={(e) => setNewEvent(prev => ({ ...prev, time: e.target.value }))}
-                        placeholder="10:00 AM - 1:00 PM"
-                        className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-slate-300 font-bold mb-1">Location Address</label>
-                      <input 
-                        type="text"
-                        value={newEvent.location}
-                        onChange={(e) => setNewEvent(prev => ({ ...prev, location: e.target.value }))}
-                        placeholder="1116 Jackson Street, Monroe, LA"
-                        className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-300 font-bold mb-1">Category Badge Label</label>
-                      <select
-                        value={newEvent.category}
-                        onChange={(e) => setNewEvent(prev => ({ ...prev, category: e.target.value }))}
-                        className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                      >
-                        <option value="General">General</option>
-                        <option value="Arts & Culture">Arts & Culture</option>
-                        <option value="Health & Nutrition">Health & Nutrition</option>
-                        <option value="Education & Skills">Education & Skills</option>
-                        <option value="Leadership">Leadership</option>
-                        <option value="Scholarship">Scholarship</option>
-                      </select>
-                    </div>
-                  </div>
-
+              {/* Organized Top Dashboard Bar */}
+              <div className="bg-neutral-950 p-4 sm:p-5 rounded-2xl border border-neutral-800 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <label className="block text-slate-300 font-bold mb-1">Brief Description of the Event</label>
-                    <textarea 
-                      rows={3}
-                      required
-                      value={newEvent.description}
-                      onChange={(e) => setNewEvent(prev => ({ ...prev, description: e.target.value }))}
-                      placeholder="Enter what participants will learn, guest speaker names, and what items to bring."
-                      className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                    ></textarea>
+                    <div className="flex items-center space-x-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <h4 className="text-base font-black text-white tracking-wide">CMS Control Center</h4>
+                      <span className="bg-red-600/20 text-red-400 border border-red-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
+                        Admin Live
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">Manage live website content, community events, galleries, and database settings.</p>
                   </div>
 
-                  <div className="flex justify-end space-x-2 pt-2">
-                    {editingEventId && (
-                      <button 
+                  <div className="flex items-center space-x-2">
+                    {saveStatus ? (
+                      <span className="text-xs text-amber-400 font-semibold bg-neutral-900 border border-amber-500/40 px-3 py-1.5 rounded-lg flex items-center space-x-1.5 animate-pulse">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                        <span>{saveStatus}</span>
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-emerald-400 font-semibold bg-emerald-950/40 border border-emerald-800/50 px-3 py-1.5 rounded-lg flex items-center space-x-1.5">
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>MySQL Synced</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Primary CMS Tabs */}
+                <div className="flex flex-wrap gap-2 pt-2 border-t border-neutral-900">
+                  {[
+                    { id: "events", label: "Events Calendar", icon: Calendar, badge: `${events.length}` },
+                    { id: "galleries", label: "Photo Galleries", icon: Camera, badge: `${galleries.length}` },
+                    { id: "content", label: "Site Content", icon: Edit },
+                    { id: "popup", label: "Alert Popup", icon: Sparkles, badge: popup.enabled ? "Active" : "Off", badgeColor: popup.enabled ? "bg-red-600 text-white" : "bg-neutral-800 text-slate-400" },
+                    { id: "contacts", label: "Inquiries", icon: Mail, badge: contactsList.length > 0 ? `${contactsList.length}` : undefined },
+                    { id: "database", label: "MySQL Database", icon: Database }
+                  ].map((t) => {
+                    const Icon = t.icon;
+                    const isActive = adminTab === t.id;
+                    return (
+                      <button
+                        key={t.id}
                         type="button"
                         onClick={() => {
-                          setEditingEventId(null);
-                          setNewEvent({ title: "", date: "", endDate: "", time: "", location: "", description: "", category: "General" });
+                          setAdminTab(t.id);
+                          if (t.id === "contacts") loadContacts();
                         }}
-                        className="bg-neutral-800 hover:bg-neutral-700 text-slate-300 px-5 py-2.5 rounded font-bold"
-                      >
-                        Cancel Edit
-                      </button>
-                    )}
-                    <button 
-                      type="submit"
-                      className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-2.5 rounded uppercase tracking-wider"
-                    >
-                      {editingEventId ? "Save Changes" : "Publish to Calendar Feed"}
-                    </button>
-                  </div>
-                </form>
-              </div>
-              </>
-              )}
-
-              {adminTab === "galleries" && (
-              /* Row 3: Manage Multiple Galleries */
-              <div className="bg-neutral-950 p-6 rounded-2xl border border-neutral-800 space-y-8 animate-fadeIn">
-
-                {/* Storage setup notice */}
-                <div className="bg-neutral-900 border border-yellow-600/30 rounded-xl p-4 text-xs text-slate-300 space-y-1">
-                  <p className="font-bold text-yellow-400 flex items-center gap-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5" /> Storage Setup Required for Photo Uploads
-                  </p>
-                  <p>To enable direct photo uploads, go to your <strong className="text-white">Supabase dashboard → Storage → New bucket</strong>. Name it <code className="bg-neutral-800 px-1 rounded text-red-400">gallery-images</code>, set it to <strong className="text-white">Public</strong>, and add an Insert policy for the <code className="bg-neutral-800 px-1 rounded">anon</code> role.</p>
-                </div>
-                
-                {/* Reset to official defaults */}
-                <div className="flex items-center justify-between bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-3">
-                  <div>
-                    <p className="text-white text-xs font-bold">Reset Galleries to Official HAMPCO Photos</p>
-                    <p className="text-slate-400 text-[11px] mt-0.5">Replaces current galleries with the real photos from hampcoinc.org.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (confirm("This will replace ALL current gallery content with the official HAMPCO photos. Continue?")) {
-                        setGalleries(DEFAULT_GALLERIES);
-                      }
-                    }}
-                    className="shrink-0 ml-4 bg-neutral-800 hover:bg-red-600 text-slate-300 hover:text-white border border-neutral-700 px-4 py-2 rounded text-xs font-bold transition-all"
-                  >
-                    Reset Now
-                  </button>
-                </div>
-
-                {/* 1. Manage existing gallery images */}
-                <div className="border-t border-neutral-800 pt-6 space-y-4">
-                  <div>
-                    <h4 className="text-lg font-bold text-white flex items-center">
-                      <Layers className="w-5 h-5 mr-2 text-red-500" />
-                      Manage Gallery Photos
-                    </h4>
-                    <p className="text-xs text-slate-400 mt-1">Select a gallery to view, edit captions, replace photos, or remove images.</p>
-                  </div>
-
-                  {/* Gallery selector tabs */}
-                  <div className="flex flex-wrap gap-2">
-                    {galleries.map(gal => (
-                      <button
-                        key={gal.id}
-                        type="button"
-                        onClick={() => setExpandedGalleryId(expandedGalleryId === gal.id ? "" : gal.id)}
-                        className={`px-3 py-1.5 rounded text-xs font-bold transition-all border ${
-                          expandedGalleryId === gal.id
-                            ? "bg-red-600 text-white border-red-600"
-                            : "bg-neutral-900 text-slate-300 border-neutral-700 hover:border-red-500"
+                        className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border ${
+                          isActive
+                            ? "bg-red-600 text-white border-red-500 shadow-lg shadow-red-600/20"
+                            : "bg-neutral-900 text-slate-300 border-neutral-800 hover:text-white hover:border-neutral-700 hover:bg-neutral-850"
                         }`}
                       >
-                        {gal.title} ({gal.images?.length ?? 0})
+                        <Icon className="w-4 h-4 shrink-0" />
+                        <span>{t.label}</span>
+                        {t.badge && (
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${
+                            isActive ? "bg-black/30 text-white" : t.badgeColor || "bg-neutral-800 text-slate-300"
+                          }`}>
+                            {t.badge}
+                          </span>
+                        )}
                       </button>
-                    ))}
-                  </div>
+                    );
+                  })}
+                </div>
+              </div>
 
-                  {/* Image list for selected gallery */}
-                  {expandedGalleryId && (() => {
-                    const gal = galleries.find(g => g.id === expandedGalleryId);
-                    if (!gal) return null;
-                    return (
-                      <div className="space-y-2">
-                        {(!gal.images || gal.images.length === 0) ? (
-                          <p className="text-slate-500 text-xs italic">No photos in this gallery yet.</p>
-                        ) : gal.images.map(img => (
-                          <div key={img.id} className="bg-neutral-900 border border-neutral-800 rounded-lg p-3">
-                            {editingImage?.imageId === img.id && editingImage ? (
-                              /* Inline edit form */
-                              <div className="space-y-3">
-                                <div className="flex gap-3 items-start">
-                                  <img src={editingImage.url} alt={editingImage.title} className="w-16 h-16 object-cover rounded shrink-0 border border-neutral-700" />
-                                  <div className="flex-1 space-y-2">
-                                    <div>
-                                      <label className="block text-slate-400 text-[11px] font-bold mb-1">Caption</label>
-                                      <input
-                                        type="text"
-                                        value={editingImage.title}
-                                        onChange={e => setEditingImage(prev => prev ? { ...prev, title: e.target.value } : prev)}
-                                        className="w-full px-3 py-1.5 rounded bg-neutral-800 border border-neutral-700 text-white text-xs focus:outline-none focus:border-red-500"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="block text-slate-400 text-[11px] font-bold mb-1">Replace Photo</label>
-                                      <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={async e => {
-                                          const file = e.target.files?.[0];
-                                          if (!file) return;
-                                          const url = await handleFileUpload(file);
-                                          if (url) setEditingImage(prev => prev ? { ...prev, url } : prev);
-                                        }}
-                                        className="w-full px-2 py-1 rounded bg-neutral-800 border border-neutral-700 text-white text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-bold file:bg-red-600 file:text-white cursor-pointer"
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="flex justify-end gap-2">
-                                  <button type="button" onClick={() => setEditingImage(null)} className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-slate-300 rounded text-xs font-bold">Cancel</button>
-                                  <button type="button" onClick={handleSaveImageEdit} className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-bold">Save Changes</button>
-                                </div>
-                              </div>
-                            ) : (
-                              /* Normal row */
-                              <div className="flex items-center gap-3">
-                                <img src={img.url} alt={img.title} className="w-14 h-14 object-cover rounded shrink-0 border border-neutral-700" />
-                                <p className="flex-1 text-slate-200 text-xs font-medium truncate">{img.title}</p>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  <button
-                                    type="button"
-                                    onClick={() => setEditingImage({ galleryId: gal.id, imageId: img.id, title: img.title, url: img.url })}
-                                    className="p-2 bg-neutral-800 hover:bg-neutral-700 text-amber-400 rounded border border-neutral-700 transition-all"
-                                    title="Edit"
-                                  >
-                                    <Edit className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteImageFromGallery(gal.id, img.id)}
-                                    className="p-2 bg-red-600 hover:bg-red-700 text-white rounded transition-all"
-                                    title="Delete"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
+              {/* ============================================================== */}
+              {/* TAB 1: EVENTS MANAGER                                         */}
+              {/* ============================================================== */}
+              {adminTab === "events" && (
+                <div className="space-y-6 animate-fadeIn">
+                  
+                  {/* Action & Filter Bar */}
+                  <div className="bg-neutral-950 p-4 sm:p-5 rounded-2xl border border-neutral-800 space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-base font-bold text-white flex items-center">
+                          <Calendar className="w-5 h-5 mr-2 text-red-500" />
+                          Community Events & Classes ({events.length})
+                        </h4>
+                        <p className="text-xs text-slate-400 mt-0.5">Manage schedules, education workshops, and graduation ceremonies.</p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isEventFormOpen && !editingEventId) {
+                            setIsEventFormOpen(false);
+                          } else {
+                            setEditingEventId(null);
+                            setNewEvent({ title: "", date: "", endDate: "", time: "", location: "", description: "", category: "General" });
+                            setIsEventFormOpen(true);
+                          }
+                        }}
+                        className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-2 transition-all shadow-md shadow-red-600/20"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>{isEventFormOpen && !editingEventId ? "Close Event Form" : "+ Create New Event"}</span>
+                      </button>
+                    </div>
+
+                    {/* Search and Category Filter */}
+                    <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-neutral-900">
+                      <div className="relative flex-1 min-w-[200px]">
+                        <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                        <input
+                          type="text"
+                          value={eventSearchQuery}
+                          onChange={(e) => setEventSearchQuery(e.target.value)}
+                          placeholder="Search events by title, description, or location..."
+                          className="w-full pl-9 pr-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-xs focus:outline-none focus:border-red-500"
+                        />
+                      </div>
+
+                      <div className="flex items-center space-x-1 overflow-x-auto pb-1 max-w-full">
+                        {["All", "Education & Skills", "Health & Nutrition", "Arts & Culture", "Scholarship", "General"].map(cat => (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => setEventCategoryFilter(cat)}
+                            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all ${
+                              eventCategoryFilter === cat
+                                ? "bg-red-600 text-white"
+                                : "bg-neutral-900 text-slate-400 hover:text-white hover:bg-neutral-800"
+                            }`}
+                          >
+                            {cat}
+                          </button>
                         ))}
                       </div>
-                    );
-                  })()}
-                </div>
-
-                {/* 2. Create Gallery */}
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="text-lg font-bold text-white flex items-center">
-                      <Camera className="w-5 h-5 mr-2 text-red-500" />
-                      Create New Image Gallery Segment
-                    </h4>
-                    <p className="text-xs text-slate-400 mt-1">Need to display a new project or community outreach? Add a gallery folder instantly.</p>
+                    </div>
                   </div>
 
-                  <form onSubmit={handleCreateGallery} className="space-y-4 text-xs">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-slate-300 font-bold mb-1">Gallery Title</label>
-                        <input 
-                          type="text"
-                          required
-                          value={newGallery.title}
-                          onChange={(e) => setNewGallery(prev => ({ ...prev, title: e.target.value }))}
-                          placeholder="e.g., 5K Walk for Autism"
-                          className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-slate-300 font-bold mb-1">Intro Description / Objective</label>
-                        <input 
-                          type="text"
-                          required
-                          value={newGallery.description}
-                          onChange={(e) => setNewGallery(prev => ({ ...prev, description: e.target.value }))}
-                          placeholder="Summarize the pictures..."
-                          className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-slate-300 font-bold mb-1">Cover Image (Optional)</label>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
-                            const url = await handleFileUpload(file);
-                            if (url) setNewGallery(prev => ({ ...prev, coverImage: url }));
-                          }}
-                          className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500 text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-red-600 file:text-white cursor-pointer"
-                        />
-                        {newGallery.coverImage && !uploadingImage && (
-                          <p className="text-green-400 text-[11px] mt-1">✓ Cover image set</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex justify-end">
-                      <button 
-                        type="submit"
-                        className="bg-red-600 hover:bg-red-700 text-white font-bold px-5 py-2 rounded"
-                      >
-                        Create Gallery Folder
-                      </button>
-                    </div>
-                  </form>
-                </div>
-
-                {/* 2. Add Photos to Existing Galleries */}
-                <div className="border-t border-neutral-800 pt-8 space-y-4">
-                  <div>
-                    <h4 className="text-lg font-bold text-white flex items-center">
-                      <Upload className="w-5 h-5 mr-2 text-red-500" />
-                      Add Photos to Existing HAMPCO Gallery Folder
-                    </h4>
-                    <p className="text-xs text-slate-400 mt-1">Select an active folder and paste an image URL to publish a photo.</p>
-                  </div>
-
-                  <form onSubmit={handleAddImageToGallery} className="space-y-4 text-xs">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-slate-300 font-bold mb-1">Select Target Gallery</label>
-                        <select
-                          value={activeAdminGalleryId}
-                          required
-                          onChange={(e) => setActiveAdminGalleryId(e.target.value)}
-                          className="w-full px-3 py-2.5 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500 text-sm"
-                        >
-                          <option value="">-- Choose Gallery Folder --</option>
-                          {galleries.map(g => (
-                            <option key={g.id} value={g.id}>{g.title}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-slate-300 font-bold mb-1">Upload Photo</label>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
-                            const url = await handleFileUpload(file);
-                            if (url) setNewImage(prev => ({ ...prev, url }));
-                          }}
-                          className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500 text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-red-600 file:text-white cursor-pointer"
-                        />
-                        {uploadingImage && (
-                          <p className="text-yellow-400 text-[11px] mt-1">Uploading image, please wait...</p>
-                        )}
-                        {uploadError && (
-                          <p className="text-red-400 text-[11px] mt-1 leading-relaxed">{uploadError}</p>
-                        )}
-                        {newImage.url && !uploadingImage && !uploadError && (
-                          <p className="text-green-400 text-[11px] mt-1">✓ Photo ready to publish</p>
-                        )}
-                      </div>
-                      <div>
-                        <label className="block text-slate-300 font-bold mb-1">Short Caption / Tagline</label>
-                        <input 
-                          type="text"
-                          required
-                          value={newImage.title}
-                          onChange={(e) => setNewImage(prev => ({ ...prev, title: e.target.value }))}
-                          placeholder="e.g., Teens exploring cooking methods"
-                          className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-end">
-                      <button 
-                        type="submit"
-                        className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-2 rounded animate-fadeIn"
-                      >
-                        Publish Photo Now
-                      </button>
-                    </div>
-                  </form>
-                </div>
-
-              </div>
-              )}
-
-              {/* Site Content Customizer Tab */}
-              {adminTab === "content" && (
-                <div className="space-y-6 animate-fadeIn">
-                  <div className="bg-neutral-950 p-6 rounded-2xl border border-neutral-800 space-y-6">
-                    <div>
-                      <h4 className="text-lg font-bold text-white flex items-center">
-                        <Edit className="w-5 h-5 mr-2 text-red-500" />
-                        Edit Site Static Content
-                      </h4>
-                      <p className="text-xs text-slate-400 mt-1">Directly update headings, description text, and contact information across the home page.</p>
-                    </div>
-
-                    <div className="space-y-6 text-xs">
-                      {/* Hero Content Section */}
-                      <div className="border-t border-neutral-900 pt-4 space-y-4">
-                        <h5 className="text-sm font-bold text-red-500 uppercase tracking-wider">Hero Section</h5>
-                        <div className="grid grid-cols-1 gap-4">
-                          <div>
-                            <label className="block text-slate-350 font-semibold mb-1">Hero Heading (Use newlines to break lines)</label>
-                            <textarea
-                              rows={2}
-                              value={siteContent.heroTitle}
-                              onChange={(e) => setSiteContent(prev => ({ ...prev, heroTitle: e.target.value }))}
-                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500 font-semibold"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-slate-350 font-semibold mb-1">Hero Subtitle Text</label>
-                            <textarea
-                              rows={3}
-                              value={siteContent.heroSubtitle}
-                              onChange={(e) => setSiteContent(prev => ({ ...prev, heroSubtitle: e.target.value }))}
-                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* About Content Section */}
-                      <div className="border-t border-neutral-900 pt-4 space-y-4">
-                        <h5 className="text-sm font-bold text-red-500 uppercase tracking-wider">About Us Section</h5>
-                        <div className="grid grid-cols-1 gap-4">
-                          <div>
-                            <label className="block text-slate-350 font-semibold mb-1">About Section Title</label>
-                            <input
-                              type="text"
-                              value={siteContent.aboutTitle}
-                              onChange={(e) => setSiteContent(prev => ({ ...prev, aboutTitle: e.target.value }))}
-                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-slate-350 font-semibold mb-1">About Description Paragraph 1</label>
-                            <textarea
-                              rows={3}
-                              value={siteContent.aboutDesc1}
-                              onChange={(e) => setSiteContent(prev => ({ ...prev, aboutDesc1: e.target.value }))}
-                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-slate-350 font-semibold mb-1">About Description Paragraph 2</label>
-                            <textarea
-                              rows={3}
-                              value={siteContent.aboutDesc2}
-                              onChange={(e) => setSiteContent(prev => ({ ...prev, aboutDesc2: e.target.value }))}
-                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Scholarships Content Section */}
-                      <div className="border-t border-neutral-900 pt-4 space-y-4">
-                        <h5 className="text-sm font-bold text-red-500 uppercase tracking-wider">Scholarships Section</h5>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-slate-350 font-semibold mb-1">Scholarship Card Title</label>
-                            <input
-                              type="text"
-                              value={siteContent.scholarshipTitle}
-                              onChange={(e) => setSiteContent(prev => ({ ...prev, scholarshipTitle: e.target.value }))}
-                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-slate-350 font-semibold mb-1">Scholarship Subheading Badge</label>
-                            <input
-                              type="text"
-                              value={siteContent.scholarshipSubtitle}
-                              onChange={(e) => setSiteContent(prev => ({ ...prev, scholarshipSubtitle: e.target.value }))}
-                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                            />
-                          </div>
-                          <div className="md:col-span-2">
-                            <label className="block text-slate-350 font-semibold mb-1">Scholarship Description Text</label>
-                            <textarea
-                              rows={3}
-                              value={siteContent.scholarshipDesc}
-                              onChange={(e) => setSiteContent(prev => ({ ...prev, scholarshipDesc: e.target.value }))}
-                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                            />
-                          </div>
-                          <div className="md:col-span-2">
-                            <label className="block text-slate-350 font-semibold mb-1">Requirements List (One item per line)</label>
-                            <textarea
-                              rows={3}
-                              value={siteContent.scholarshipReqsText}
-                              onChange={(e) => setSiteContent(prev => ({ ...prev, scholarshipReqsText: e.target.value }))}
-                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Contact Details Section */}
-                      <div className="border-t border-neutral-900 pt-4 space-y-4">
-                        <h5 className="text-sm font-bold text-red-500 uppercase tracking-wider">Contact & Office Hours</h5>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-slate-350 font-semibold mb-1">Office Hours Time</label>
-                            <input
-                              type="text"
-                              value={siteContent.officeHours}
-                              onChange={(e) => setSiteContent(prev => ({ ...prev, officeHours: e.target.value }))}
-                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-slate-350 font-semibold mb-1">Office Days</label>
-                            <input
-                              type="text"
-                              value={siteContent.officeDays}
-                              onChange={(e) => setSiteContent(prev => ({ ...prev, officeDays: e.target.value }))}
-                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-slate-350 font-semibold mb-1">Physical Address Line 1</label>
-                            <input
-                              type="text"
-                              value={siteContent.hqAddressLine1}
-                              onChange={(e) => setSiteContent(prev => ({ ...prev, hqAddressLine1: e.target.value }))}
-                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-slate-350 font-semibold mb-1">Physical Address Line 2</label>
-                            <input
-                              type="text"
-                              value={siteContent.hqAddressLine2}
-                              onChange={(e) => setSiteContent(prev => ({ ...prev, hqAddressLine2: e.target.value }))}
-                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-slate-350 font-semibold mb-1">Mailing Address Line 1</label>
-                            <input
-                              type="text"
-                              value={siteContent.mailingAddressLine1}
-                              onChange={(e) => setSiteContent(prev => ({ ...prev, mailingAddressLine1: e.target.value }))}
-                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-slate-350 font-semibold mb-1">Mailing Address Line 2</label>
-                            <input
-                              type="text"
-                              value={siteContent.mailingAddressLine2}
-                              onChange={(e) => setSiteContent(prev => ({ ...prev, mailingAddressLine2: e.target.value }))}
-                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-slate-350 font-semibold mb-1">Main Office Phone</label>
-                            <input
-                              type="text"
-                              value={siteContent.phoneMain}
-                              onChange={(e) => setSiteContent(prev => ({ ...prev, phoneMain: e.target.value }))}
-                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-slate-350 font-semibold mb-1">Alt Phones / Info</label>
-                            <input
-                              type="text"
-                              value={siteContent.phoneAlt}
-                              onChange={(e) => setSiteContent(prev => ({ ...prev, phoneAlt: e.target.value }))}
-                              className="w-full px-3 py-2 rounded bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Reset to defaults */}
-                      <div className="flex items-center justify-between bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-3 mt-6">
+                  {/* Add / Edit Event Collapsible Form */}
+                  {isEventFormOpen && (
+                    <div id="edit-event-form" className="bg-neutral-950 p-6 rounded-2xl border-2 border-red-500/40 space-y-5 animate-scaleIn shadow-2xl">
+                      <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
                         <div>
-                          <p className="text-white text-xs font-bold">Reset Website Content to Default</p>
-                          <p className="text-slate-400 text-[11px] mt-0.5">Replaces current text content with the official defaults.</p>
+                          <h4 className="text-base font-bold text-white flex items-center">
+                            {editingEventId ? <Edit className="w-5 h-5 mr-2 text-amber-400" /> : <Plus className="w-5 h-5 mr-2 text-red-500" />}
+                            {editingEventId ? "Edit Event Details" : "Create & Publish New Event"}
+                          </h4>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            {editingEventId ? "Modify this event and click Save Changes." : "Fill details below to add this event to the community calendar."}
+                          </p>
                         </div>
                         <button
                           type="button"
                           onClick={() => {
-                            if (confirm("This will replace all edited headings, about text, and contact information with default values. Continue?")) {
-                              setSiteContent(DEFAULT_SITE_CONTENT);
+                            setIsEventFormOpen(false);
+                            setEditingEventId(null);
+                          }}
+                          className="p-1.5 rounded-lg bg-neutral-900 text-slate-400 hover:text-white hover:bg-neutral-800"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <form onSubmit={handleSaveEvent} className="space-y-4 text-xs">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                          <div className="sm:col-span-2">
+                            <label className="block text-slate-300 font-bold mb-1">Event Name / Title *</label>
+                            <input
+                              type="text"
+                              required
+                              value={newEvent.title}
+                              onChange={(e) => setNewEvent(prev => ({ ...prev, title: e.target.value }))}
+                              placeholder="e.g. Financial Literacy – Week 1"
+                              className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500 font-semibold"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-300 font-bold mb-1">Category *</label>
+                            <select
+                              value={newEvent.category}
+                              onChange={(e) => setNewEvent(prev => ({ ...prev, category: e.target.value }))}
+                              className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500 font-medium"
+                            >
+                              <option value="General">General</option>
+                              <option value="Education & Skills">Education & Skills</option>
+                              <option value="Health & Nutrition">Health & Nutrition</option>
+                              <option value="Arts & Culture">Arts & Culture</option>
+                              <option value="Scholarship">Scholarship</option>
+                              <option value="Leadership">Leadership</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-slate-300 font-bold mb-1">Start Date *</label>
+                            <input
+                              type="date"
+                              required
+                              value={newEvent.date}
+                              onChange={(e) => setNewEvent(prev => ({ ...prev, date: e.target.value }))}
+                              className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          <div>
+                            <label className="block text-slate-300 font-bold mb-1">End Date (Optional)</label>
+                            <input
+                              type="date"
+                              value={newEvent.endDate || ""}
+                              onChange={(e) => setNewEvent(prev => ({ ...prev, endDate: e.target.value }))}
+                              className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-300 font-bold mb-1">Time Range</label>
+                            <input
+                              type="text"
+                              value={newEvent.time}
+                              onChange={(e) => setNewEvent(prev => ({ ...prev, time: e.target.value }))}
+                              placeholder="e.g. 5:30 PM - 7:00 PM"
+                              className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-300 font-bold mb-1">Location Address</label>
+                            <input
+                              type="text"
+                              value={newEvent.location}
+                              onChange={(e) => setNewEvent(prev => ({ ...prev, location: e.target.value }))}
+                              placeholder="1116 Jackson Street, Monroe, LA"
+                              className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-300 font-bold mb-1">Full Description & Guest Speakers *</label>
+                          <textarea
+                            rows={3}
+                            required
+                            value={newEvent.description}
+                            onChange={(e) => setNewEvent(prev => ({ ...prev, description: e.target.value }))}
+                            placeholder="Detail what attendees will learn, guest speaker names, requirements, and RSVP details."
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-white focus:outline-none focus:border-red-500"
+                          ></textarea>
+                        </div>
+
+                        <div className="flex justify-end items-center space-x-3 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsEventFormOpen(false);
+                              setEditingEventId(null);
+                            }}
+                            className="bg-neutral-900 hover:bg-neutral-800 text-slate-300 px-5 py-2.5 rounded-xl font-bold border border-neutral-800"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-2.5 rounded-xl uppercase tracking-wider shadow-lg shadow-red-600/30"
+                          >
+                            {editingEventId ? "Save Event Changes" : "Publish to Calendar Feed"}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  )}
+
+                  {/* Filtered Events List */}
+                  <div className="bg-neutral-950 p-6 rounded-2xl border border-neutral-800 space-y-4">
+                    <div className="flex items-center justify-between text-xs text-slate-400">
+                      <span>Showing {filteredEvents.length} of {events.length} events</span>
+                      {eventSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setEventSearchQuery("")}
+                          className="text-red-400 hover:underline"
+                        >
+                          Clear search
+                        </button>
+                      )}
+                    </div>
+
+                    {filteredEvents.length === 0 ? (
+                      <div className="text-center py-12 text-slate-500 text-xs bg-neutral-900/50 rounded-2xl border border-neutral-900">
+                        No events found matching your search. Try another query or create a new event.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {filteredEvents.map((evt: any) => {
+                          const eventDate = parseLocalDate(evt.date);
+                          const monthStr = eventDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+                          const dayStr = eventDate.getDate();
+
+                          return (
+                            <div key={evt.id} className="bg-neutral-900 border border-neutral-800 hover:border-neutral-700 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all">
+                              
+                              <div className="flex items-start space-x-4 min-w-0">
+                                {/* Visual Date Box */}
+                                <div className="w-12 h-14 rounded-xl bg-neutral-950 border border-neutral-800 flex flex-col items-center justify-center shrink-0">
+                                  <span className="text-[10px] font-black text-red-500 leading-none">{monthStr}</span>
+                                  <span className="text-base font-black text-white leading-none mt-1">{dayStr}</span>
+                                </div>
+
+                                <div className="min-w-0 space-y-1">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <h5 className="text-white text-sm font-bold truncate">{evt.title}</h5>
+                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase ${
+                                      evt.category === 'Education & Skills' ? 'bg-blue-900/50 text-blue-300 border border-blue-700/50' :
+                                      evt.category === 'Health & Nutrition' ? 'bg-emerald-900/50 text-emerald-300 border border-emerald-700/50' :
+                                      evt.category === 'Scholarship' ? 'bg-red-900/50 text-red-300 border border-red-700/50' :
+                                      evt.category === 'Arts & Culture' ? 'bg-purple-900/50 text-purple-300 border border-purple-700/50' :
+                                      'bg-slate-800 text-slate-300 border border-slate-700'
+                                    }`}>
+                                      {evt.category}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-slate-400 text-xs">
+                                    {evt.time && (
+                                      <span className="flex items-center">
+                                        <Clock className="w-3.5 h-3.5 mr-1 text-slate-500" />
+                                        {evt.time}
+                                      </span>
+                                    )}
+                                    {evt.location && (
+                                      <span className="flex items-center truncate">
+                                        <MapPin className="w-3.5 h-3.5 mr-1 text-slate-500 shrink-0" />
+                                        <span className="truncate">{evt.location}</span>
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {evt.description && (
+                                    <p className="text-xs text-slate-400 line-clamp-2 pt-1">{evt.description}</p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Action Buttons */}
+                              <div className="flex items-center space-x-2 shrink-0 self-end md:self-center pt-2 md:pt-0 border-t md:border-t-0 border-neutral-800">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDuplicateEvent(evt)}
+                                  className="p-2 bg-neutral-800 hover:bg-neutral-700 text-sky-400 rounded-lg border border-neutral-700 transition-all"
+                                  title="Duplicate Event"
+                                >
+                                  <Copy className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditEventClick(evt)}
+                                  className="p-2 bg-neutral-800 hover:bg-neutral-700 text-amber-400 rounded-lg border border-neutral-700 transition-all"
+                                  title="Edit Event"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteEvent(evt.id)}
+                                  className="p-2 bg-red-600/80 hover:bg-red-600 text-white rounded-lg transition-all"
+                                  title="Delete Event"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ============================================================== */}
+              {/* TAB 4: ALERT POPUP WITH REAL-TIME LIVE PREVIEW                 */}
+              {/* ============================================================== */}
+              {adminTab === "popup" && (
+                <div className="space-y-6 animate-fadeIn">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    
+                    {/* Controls Column */}
+                    <div className="lg:col-span-6 bg-neutral-950 p-6 rounded-2xl border border-neutral-800 space-y-5">
+                      <div>
+                        <h4 className="text-base font-bold text-white flex items-center">
+                          <Sparkles className="w-5 h-5 mr-2 text-red-500" />
+                          Alert Popup Announcement Controls
+                        </h4>
+                        <p className="text-xs text-slate-400 mt-0.5">Control the urgent dialog banner shown to website visitors.</p>
+                      </div>
+
+                      {/* Enable Switch Toggle */}
+                      <div className="bg-neutral-900 p-4 rounded-xl border border-neutral-800 flex items-center justify-between">
+                        <div>
+                          <p className="text-white font-bold text-xs">Display Alert Popup to Visitors</p>
+                          <p className="text-slate-400 text-[11px] mt-0.5">When ON, visitors will see the announcement modal upon opening the site.</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={popup.enabled}
+                            onChange={(e) => updatePopupConfig('enabled', e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-neutral-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+                        </label>
+                      </div>
+
+                      {/* Color Theme Selector */}
+                      <div className="bg-neutral-900 p-4 rounded-xl border border-neutral-800 space-y-2">
+                        <label className="block text-slate-300 font-bold text-xs">Modal Color Palette</label>
+                        <div className="grid grid-cols-4 gap-2">
+                          {[
+                            { id: "red", label: "Crimson Red", bg: "bg-red-600" },
+                            { id: "black", label: "Midnight", bg: "bg-neutral-950" },
+                            { id: "blue", label: "Navy Blue", bg: "bg-blue-700" },
+                            { id: "slate", label: "Slate Gray", bg: "bg-slate-800" }
+                          ].map(color => (
+                            <button
+                              key={color.id}
+                              type="button"
+                              onClick={() => updatePopupConfig('bgColor', color.id)}
+                              className={`p-2 rounded-xl text-center border transition-all ${
+                                popup.bgColor === color.id
+                                  ? "border-red-500 ring-2 ring-red-500/30 bg-neutral-800 text-white"
+                                  : "border-neutral-800 bg-neutral-950 text-slate-400 hover:text-white"
+                              }`}
+                            >
+                              <div className={`w-4 h-4 rounded-full ${color.bg} mx-auto mb-1 border border-white/20`} />
+                              <span className="text-[10px] font-bold block truncate">{color.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Text inputs */}
+                      <div className="space-y-3 text-xs">
+                        <div>
+                          <label className="block text-slate-300 font-bold mb-1">Banner Title</label>
+                          <input
+                            type="text"
+                            value={popup.title}
+                            onChange={(e) => updatePopupConfig('title', e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-white font-bold text-xs focus:outline-none focus:border-red-500"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-slate-300 font-bold mb-1">Action Button Text</label>
+                            <input
+                              type="text"
+                              value={popup.buttonText}
+                              onChange={(e) => updatePopupConfig('buttonText', e.target.value)}
+                              className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-xs focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-300 font-bold mb-1">Button Link Target</label>
+                            <input
+                              type="text"
+                              value={popup.buttonLink}
+                              onChange={(e) => updatePopupConfig('buttonLink', e.target.value)}
+                              placeholder="#scholarships"
+                              className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-xs focus:outline-none focus:border-red-500 font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-300 font-bold mb-1">Announcement Message Body</label>
+                          <textarea
+                            rows={4}
+                            value={popup.message}
+                            onChange={(e) => updatePopupConfig('message', e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-xs focus:outline-none focus:border-red-500 leading-relaxed"
+                          ></textarea>
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* Real-time Interactive Live Preview */}
+                    <div className="lg:col-span-6 bg-neutral-950 p-6 rounded-2xl border border-neutral-800 space-y-4 flex flex-col">
+                      <div className="flex items-center justify-between pb-3 border-b border-neutral-900">
+                        <div className="flex items-center space-x-2">
+                          <Eye className="w-4 h-4 text-emerald-400" />
+                          <h4 className="text-sm font-bold text-white">Live Visitor Modal Preview</h4>
+                        </div>
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase ${
+                          popup.enabled ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-neutral-800 text-slate-400"
+                        }`}>
+                          {popup.enabled ? "Modal Enabled" : "Modal Hidden"}
+                        </span>
+                      </div>
+
+                      <div className="flex-1 flex items-center justify-center bg-neutral-900/60 rounded-xl p-4 border border-neutral-900">
+                        {(() => {
+                          const previewColors = getPopupColorClasses(popup.bgColor);
+                          return (
+                            <div className="bg-white rounded-2xl overflow-hidden max-w-sm w-full shadow-2xl border border-slate-200 transform scale-95 transition-all">
+                              {/* Modal Top Bar */}
+                              <div className={`${previewColors.bg} p-4 text-white flex justify-between items-center`}>
+                                <div className="flex items-center space-x-2">
+                                  <Sparkles className="w-4 h-4 text-yellow-300 shrink-0" />
+                                  <span className="text-[10px] font-black uppercase tracking-wider">HAMPCO Announcement</span>
+                                </div>
+                                <div className="p-1 rounded-full bg-white/20 text-white/80">
+                                  <X className="w-3.5 h-3.5" />
+                                </div>
+                              </div>
+
+                              {/* Modal Body */}
+                              <div className="p-5 text-slate-800 space-y-3">
+                                <h4 className="text-sm font-black text-slate-900 leading-snug">
+                                  {popup.title || "Announcement Title"}
+                                </h4>
+                                <p className="text-xs text-slate-600 leading-relaxed">
+                                  {popup.message || "Announcement body text will appear here."}
+                                </p>
+                                <div className="pt-2">
+                                  <div className={`w-full py-2.5 px-4 rounded-xl text-center text-xs font-bold shadow-md cursor-default ${previewColors.btn}`}>
+                                    {popup.buttonText || "Learn More"}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              )}
+
+              {/* ============================================================== */}
+              {/* TAB 2: GALLERIES MANAGER                                      */}
+              {/* ============================================================== */}
+              {adminTab === "galleries" && (
+                <div className="space-y-6 animate-fadeIn">
+                  
+                  {/* Gallery Folder Selector Strip */}
+                  <div className="bg-neutral-950 p-6 rounded-2xl border border-neutral-800 space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-base font-bold text-white flex items-center">
+                          <Camera className="w-5 h-5 mr-2 text-red-500" />
+                          Photo Galleries & Albums
+                        </h4>
+                        <p className="text-xs text-slate-400 mt-0.5">Select a gallery to view and manage photos, or create a brand new album.</p>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsNewGalleryModalOpen(!isNewGalleryModalOpen)}
+                          className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-2 transition-all shadow-md"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>{isNewGalleryModalOpen ? "Close Album Form" : "New Album Folder"}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* New Gallery Form (Collapsible) */}
+                    {isNewGalleryModalOpen && (
+                      <div className="bg-neutral-900 p-5 rounded-xl border border-red-500/30 space-y-4 animate-scaleIn mt-4">
+                        <h5 className="text-sm font-bold text-white flex items-center">
+                          <Plus className="w-4 h-4 mr-1 text-red-400" />
+                          Create New Gallery Folder
+                        </h5>
+                        <form onSubmit={handleCreateGallery} className="space-y-3 text-xs">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-slate-300 font-bold mb-1">Gallery Title *</label>
+                              <input
+                                type="text"
+                                required
+                                value={newGallery.title}
+                                onChange={e => setNewGallery(prev => ({ ...prev, title: e.target.value }))}
+                                placeholder="e.g. 2026 Walk for Autism"
+                                className="w-full px-3 py-2 rounded-lg bg-neutral-800 border border-neutral-700 text-white focus:outline-none focus:border-red-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-slate-300 font-bold mb-1">Description *</label>
+                              <input
+                                type="text"
+                                required
+                                value={newGallery.description}
+                                onChange={e => setNewGallery(prev => ({ ...prev, description: e.target.value }))}
+                                placeholder="Summary of this community album..."
+                                className="w-full px-3 py-2 rounded-lg bg-neutral-800 border border-neutral-700 text-white focus:outline-none focus:border-red-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-slate-300 font-bold mb-1">Cover Image (Optional)</label>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={async e => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  const url = await handleFileUpload(file);
+                                  if (url) setNewGallery(prev => ({ ...prev, coverImage: url }));
+                                }}
+                                className="w-full px-2 py-1.5 rounded-lg bg-neutral-800 border border-neutral-700 text-white text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-bold file:bg-red-600 file:text-white cursor-pointer"
+                              />
+                              {newGallery.coverImage && (
+                                <p className="text-emerald-400 text-[10px] mt-1">✓ Cover image attached</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex justify-end space-x-2 pt-2">
+                            <button
+                              type="button"
+                              onClick={() => setIsNewGalleryModalOpen(false)}
+                              className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-slate-300 rounded-lg font-bold"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="submit"
+                              className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg shadow"
+                            >
+                              Create Folder
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    )}
+
+                    {/* Album Selection Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                      {galleries.map(gal => {
+                        const isSelected = (currentAdminGallery?.id === gal.id);
+                        return (
+                          <button
+                            key={gal.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedAdminGalleryId(gal.id);
+                              setActiveAdminGalleryId(gal.id);
+                            }}
+                            className={`p-3 rounded-xl border text-left transition-all flex items-center space-x-3 ${
+                              isSelected
+                                ? "bg-red-600/15 border-red-500 ring-2 ring-red-500/20"
+                                : "bg-neutral-900 border-neutral-800 hover:border-neutral-700"
+                            }`}
+                          >
+                            <img
+                              src={gal.coverImage || "https://hampcoinc.org/assets/images/mbr-1-1145x763.jpeg"}
+                              alt={gal.title}
+                              className="w-12 h-12 rounded-lg object-cover border border-neutral-800 shrink-0"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <h5 className="text-white text-xs font-bold truncate">{gal.title}</h5>
+                              <p className="text-slate-400 text-[11px] mt-0.5">{gal.images?.length || 0} Photos</p>
+                            </div>
+                            {isSelected && (
+                              <Check className="w-4 h-4 text-red-500 shrink-0" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Active Gallery Workspace */}
+                  {currentAdminGallery && (
+                    <div className="bg-neutral-950 p-6 rounded-2xl border border-neutral-800 space-y-6">
+                      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-neutral-900">
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-red-500 font-black text-xs uppercase tracking-wider">Active Album</span>
+                            <span className="text-slate-600">·</span>
+                            <span className="text-slate-400 text-xs">{currentAdminGallery.images?.length || 0} photos uploaded</span>
+                          </div>
+                          <h4 className="text-lg font-bold text-white mt-0.5">{currentAdminGallery.title}</h4>
+                          <p className="text-xs text-slate-400 mt-0.5">{currentAdminGallery.description}</p>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsAddingPhoto(!isAddingPhoto)}
+                            className="bg-neutral-900 hover:bg-neutral-800 text-white font-bold px-3.5 py-2 rounded-xl text-xs flex items-center space-x-1.5 border border-neutral-700 transition-all"
+                          >
+                            <Upload className="w-3.5 h-3.5 text-red-400" />
+                            <span>{isAddingPhoto ? "Close Photo Upload" : "+ Add Photos to Album"}</span>
+                          </button>
+                          {galleries.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteGallery(currentAdminGallery.id)}
+                              className="bg-neutral-900 hover:bg-red-650 text-slate-400 hover:text-white font-bold p-2 rounded-xl text-xs border border-neutral-800 transition-all"
+                              title="Delete Gallery Folder"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Photo Upload Box (Toggled) */}
+                      {isAddingPhoto && (
+                        <div className="bg-neutral-900 p-5 rounded-xl border border-neutral-800 space-y-3 animate-scaleIn">
+                          <h5 className="text-xs font-bold text-white uppercase tracking-wider flex items-center">
+                            <Upload className="w-3.5 h-3.5 mr-1.5 text-red-500" />
+                            Upload Photo to "{currentAdminGallery.title}"
+                          </h5>
+                          <form
+                            onSubmit={(e) => {
+                              setActiveAdminGalleryId(currentAdminGallery.id);
+                              handleAddImageToGallery(e);
+                              setIsAddingPhoto(false);
+                            }}
+                            className="space-y-3 text-xs"
+                          >
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-slate-300 font-bold mb-1">Choose Photo *</label>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={async e => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    const url = await handleFileUpload(file);
+                                    if (url) setNewImage(prev => ({ ...prev, url }));
+                                  }}
+                                  className="w-full px-2.5 py-2 rounded-lg bg-neutral-800 border border-neutral-700 text-white text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-bold file:bg-red-600 file:text-white cursor-pointer"
+                                />
+                                {uploadingImage && <p className="text-amber-400 text-[10px] mt-1">Uploading image to server...</p>}
+                                {newImage.url && !uploadingImage && <p className="text-emerald-400 text-[10px] mt-1">✓ Ready to attach</p>}
+                              </div>
+                              <div>
+                                <label className="block text-slate-300 font-bold mb-1">Caption / Description *</label>
+                                <input
+                                  type="text"
+                                  required
+                                  value={newImage.title}
+                                  onChange={e => setNewImage(prev => ({ ...prev, title: e.target.value }))}
+                                  placeholder="e.g. Students receiving honors certificates"
+                                  className="w-full px-3 py-2 rounded-lg bg-neutral-800 border border-neutral-700 text-white focus:outline-none focus:border-red-500"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex justify-end space-x-2">
+                              <button
+                                type="button"
+                                onClick={() => setIsAddingPhoto(false)}
+                                className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-slate-300 rounded-lg font-bold"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="submit"
+                                disabled={!newImage.url || !newImage.title}
+                                className="px-5 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold rounded-lg"
+                              >
+                                Publish Photo
+                              </button>
+                            </div>
+                          </form>
+                        </div>
+                      )}
+
+                      {/* Photo Grid */}
+                      {(!currentAdminGallery.images || currentAdminGallery.images.length === 0) ? (
+                        <div className="text-center py-12 text-slate-500 text-xs bg-neutral-900/40 rounded-xl border border-neutral-900 space-y-2">
+                          <Camera className="w-8 h-8 mx-auto text-slate-600" />
+                          <p>No photos in this album yet.</p>
+                          <button
+                            type="button"
+                            onClick={() => setIsAddingPhoto(true)}
+                            className="text-red-500 font-bold hover:underline"
+                          >
+                            + Click here to upload the first photo
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                          {currentAdminGallery.images.map(img => (
+                            <div key={img.id} className="group relative bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden space-y-2 pb-2">
+                              {editingImage && editingImage.imageId === img.id ? (
+                                /* Inline Edit Form */
+                                <div className="p-3 space-y-2 bg-neutral-950">
+                                  <img src={editingImage.url} alt="Preview" className="w-full h-24 object-cover rounded-lg" />
+                                  <input
+                                    type="text"
+                                    value={editingImage.title}
+                                    onChange={e => setEditingImage(prev => prev ? { ...prev, title: e.target.value } : prev)}
+                                    className="w-full px-2 py-1 rounded bg-neutral-800 border border-neutral-700 text-white text-xs"
+                                  />
+                                  <div className="flex justify-end space-x-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingImage(null)}
+                                      className="px-2 py-1 bg-neutral-800 text-slate-300 rounded text-[10px]"
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={handleSaveImageEdit}
+                                      className="px-2.5 py-1 bg-red-600 text-white rounded text-[10px] font-bold"
+                                    >
+                                      Save
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                /* Photo Card */
+                                <>
+                                  <div className="aspect-video relative overflow-hidden bg-neutral-950">
+                                    <img
+                                      src={img.url}
+                                      alt={img.title}
+                                      className="w-full h-full object-cover group-hover:scale-105 transition-all duration-300"
+                                    />
+                                    <div className="absolute top-2 right-2 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 backdrop-blur-sm p-1 rounded-lg">
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingImage({ galleryId: currentAdminGallery.id, imageId: img.id, title: img.title, url: img.url })}
+                                        className="p-1 text-amber-400 hover:text-white rounded"
+                                        title="Edit Caption"
+                                      >
+                                        <Edit className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteImageFromGallery(currentAdminGallery.id, img.id)}
+                                        className="p-1 text-red-400 hover:text-white rounded"
+                                        title="Delete Photo"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <p className="px-2 text-[11px] font-semibold text-slate-300 line-clamp-2 leading-tight" title={img.title}>
+                                    {img.title}
+                                  </p>
+                                </>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Reset to defaults helper */}
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-6 border-t border-neutral-900 text-xs">
+                        <div className="text-slate-400 text-[11px]">
+                          Need to restore default photos? You can reset to the official HAMPCO community archive.
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm("Replace all current galleries with official default HAMPCO photos?")) {
+                              setGalleries(DEFAULT_GALLERIES);
                             }
                           }}
-                          className="bg-neutral-800 hover:bg-red-650 text-slate-300 hover:text-white border border-neutral-700 px-4 py-2 rounded text-xs font-bold transition-all"
+                          className="text-slate-400 hover:text-white text-xs underline"
                         >
-                          Reset Content
+                          Reset to Official Photos
                         </button>
                       </div>
 
                     </div>
+                  )}
+                </div>
+              )}
+
+              {/* ============================================================== */}
+              {/* TAB 3: SITE CONTENT CUSTOMIZER                                */}
+              {/* ============================================================== */}
+              {adminTab === "content" && (
+                <div className="space-y-6 animate-fadeIn">
+                  <div className="bg-neutral-950 p-6 rounded-2xl border border-neutral-800 space-y-6">
+                    <div>
+                      <h4 className="text-base font-bold text-white flex items-center">
+                        <Edit className="w-5 h-5 mr-2 text-red-500" />
+                        Website Content Customizer
+                      </h4>
+                      <p className="text-xs text-slate-400 mt-0.5">Edit homepage headings, descriptions, and office information with live MySQL sync.</p>
+                    </div>
+
+                    {/* Sub-Navigation Pills */}
+                    <div className="flex flex-wrap gap-2 pb-4 border-b border-neutral-900">
+                      {[
+                        { id: "hero", label: "Hero Banner" },
+                        { id: "about", label: "About HAMPCO" },
+                        { id: "scholarship", label: "Scholarships" },
+                        { id: "contact", label: "Office & Contact Hours" }
+                      ].map(sub => (
+                        <button
+                          key={sub.id}
+                          type="button"
+                          onClick={() => setContentSubTab(sub.id as any)}
+                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                            contentSubTab === sub.id
+                              ? "bg-red-600 text-white shadow-md shadow-red-600/20"
+                              : "bg-neutral-900 text-slate-400 hover:text-white hover:bg-neutral-800"
+                          }`}
+                        >
+                          {sub.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Sub-tab 1: Hero */}
+                    {contentSubTab === "hero" && (
+                      <div className="space-y-4 animate-fadeIn">
+                        <div>
+                          <label className="block text-slate-300 font-bold mb-1">Hero Main Title (Use Enter for newlines)</label>
+                          <textarea
+                            rows={2}
+                            value={siteContent.heroTitle}
+                            onChange={(e) => setSiteContent(prev => ({ ...prev, heroTitle: e.target.value }))}
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-white font-bold text-sm focus:outline-none focus:border-red-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-slate-300 font-bold mb-1">Hero Subtitle Paragraph</label>
+                          <textarea
+                            rows={3}
+                            value={siteContent.heroSubtitle}
+                            onChange={(e) => setSiteContent(prev => ({ ...prev, heroSubtitle: e.target.value }))}
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-xs focus:outline-none focus:border-red-500 leading-relaxed"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Sub-tab 2: About */}
+                    {contentSubTab === "about" && (
+                      <div className="space-y-4 animate-fadeIn">
+                        <div>
+                          <label className="block text-slate-300 font-bold mb-1">About Section Heading</label>
+                          <input
+                            type="text"
+                            value={siteContent.aboutTitle}
+                            onChange={(e) => setSiteContent(prev => ({ ...prev, aboutTitle: e.target.value }))}
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-white font-bold text-sm focus:outline-none focus:border-red-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-slate-300 font-bold mb-1">About Description Paragraph 1</label>
+                          <textarea
+                            rows={3}
+                            value={siteContent.aboutDesc1}
+                            onChange={(e) => setSiteContent(prev => ({ ...prev, aboutDesc1: e.target.value }))}
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-xs focus:outline-none focus:border-red-500 leading-relaxed"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-slate-300 font-bold mb-1">About Description Paragraph 2</label>
+                          <textarea
+                            rows={3}
+                            value={siteContent.aboutDesc2}
+                            onChange={(e) => setSiteContent(prev => ({ ...prev, aboutDesc2: e.target.value }))}
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-xs focus:outline-none focus:border-red-500 leading-relaxed"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Sub-tab 3: Scholarship */}
+                    {contentSubTab === "scholarship" && (
+                      <div className="space-y-4 animate-fadeIn">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-slate-300 font-bold mb-1">Program Title</label>
+                            <input
+                              type="text"
+                              value={siteContent.scholarshipTitle}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, scholarshipTitle: e.target.value }))}
+                              className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-white font-bold text-xs focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-300 font-bold mb-1">District / Subtitle Badge</label>
+                            <input
+                              type="text"
+                              value={siteContent.scholarshipSubtitle}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, scholarshipSubtitle: e.target.value }))}
+                              className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-white font-bold text-xs focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-slate-300 font-bold mb-1">Scholarship Overview</label>
+                          <textarea
+                            rows={3}
+                            value={siteContent.scholarshipDesc}
+                            onChange={(e) => setSiteContent(prev => ({ ...prev, scholarshipDesc: e.target.value }))}
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-xs focus:outline-none focus:border-red-500 leading-relaxed"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-slate-300 font-bold mb-1">Requirements (One bullet point per line)</label>
+                          <textarea
+                            rows={3}
+                            value={siteContent.scholarshipReqsText}
+                            onChange={(e) => setSiteContent(prev => ({ ...prev, scholarshipReqsText: e.target.value }))}
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-xs focus:outline-none focus:border-red-500 leading-relaxed font-mono"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Sub-tab 4: Contact & Hours */}
+                    {contentSubTab === "contact" && (
+                      <div className="space-y-4 animate-fadeIn">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-slate-300 font-bold mb-1">Office Hours</label>
+                            <input
+                              type="text"
+                              value={siteContent.officeHours}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, officeHours: e.target.value }))}
+                              placeholder="10:00 AM to 2:00 PM"
+                              className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-xs focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-300 font-bold mb-1">Operating Days</label>
+                            <input
+                              type="text"
+                              value={siteContent.officeDays}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, officeDays: e.target.value }))}
+                              placeholder="Tuesday, Wednesday, and Thursday"
+                              className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-xs focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-300 font-bold mb-1">Headquarters Address Line 1</label>
+                            <input
+                              type="text"
+                              value={siteContent.hqAddressLine1}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, hqAddressLine1: e.target.value }))}
+                              className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-xs focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-300 font-bold mb-1">Headquarters City, State ZIP</label>
+                            <input
+                              type="text"
+                              value={siteContent.hqAddressLine2}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, hqAddressLine2: e.target.value }))}
+                              className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-xs focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-300 font-bold mb-1">Main Phone Number</label>
+                            <input
+                              type="text"
+                              value={siteContent.phoneMain}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, phoneMain: e.target.value }))}
+                              className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-xs focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-300 font-bold mb-1">Alternate Numbers / Contacts</label>
+                            <input
+                              type="text"
+                              value={siteContent.phoneAlt}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, phoneAlt: e.target.value }))}
+                              className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-xs focus:outline-none focus:border-red-500"
+                            />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <label className="block text-slate-300 font-bold mb-1">Form Destination Email Address</label>
+                            <input
+                              type="email"
+                              value={siteContent.contactEmail || "carrie.simon.hampco@gmail.com"}
+                              onChange={(e) => setSiteContent(prev => ({ ...prev, contactEmail: e.target.value }))}
+                              className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-xs focus:outline-none focus:border-red-500 font-semibold"
+                            />
+                            <p className="text-[11px] text-slate-400 mt-1">All messages submitted via the public contact form are dispatched immediately to this email address.</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Reset Button */}
+                    <div className="flex items-center justify-between pt-6 border-t border-neutral-900 text-xs">
+                      <span className="text-slate-400 text-[11px]">All text changes are auto-saved to MySQL in real-time.</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (confirm("Reset website text to default HAMPCO content?")) {
+                            setSiteContent(DEFAULT_SITE_CONTENT);
+                          }
+                        }}
+                        className="text-slate-400 hover:text-white underline text-xs"
+                      >
+                        Reset Text to Defaults
+                      </button>
+                    </div>
+
+                  </div>
+                </div>
+              )}
+
+              {/* Inquiries / Messages from contact form */}
+              {adminTab === "contacts" && (
+                <div className="bg-neutral-950 p-6 rounded-2xl border border-neutral-800 space-y-6">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                      <h4 className="text-lg font-bold text-white flex items-center">
+                        <Mail className="w-5 h-5 text-red-500 mr-2" />
+                        Visitor Inquiries & Submissions ({contactsList.length})
+                      </h4>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Form inquiries are emailed directly to <strong className="text-red-400">carrie.simon.hampco@gmail.com</strong> and archived in MySQL (<code className="text-slate-300">hampco_contacts</code>).
+                      </p>
+                    </div>
+                    <button
+                      onClick={loadContacts}
+                      className="bg-neutral-900 hover:bg-neutral-800 text-slate-300 border border-neutral-700 px-3 py-1.5 rounded text-xs font-bold flex items-center space-x-1.5 transition-all"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${loadingContacts ? 'animate-spin' : ''}`} />
+                      <span>Refresh Inquiries</span>
+                    </button>
+                  </div>
+
+                  {contactsList.length === 0 ? (
+                    <div className="text-center py-12 text-slate-500 text-xs bg-neutral-900/40 rounded-xl border border-neutral-900">
+                      {loadingContacts ? "Querying MySQL for inquiries..." : "No visitor inquiries recorded yet in MySQL."}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {contactsList.map((contact) => (
+                        <div key={contact.id} className="p-4 rounded-xl bg-neutral-900 border border-neutral-800 space-y-2">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-white font-bold">{contact.name}</span>
+                            <span className="text-slate-500 text-[11px]">{contact.created_at}</span>
+                          </div>
+                          <div className="flex flex-wrap gap-4 text-xs text-slate-400">
+                            <span><strong className="text-slate-300">Email:</strong> {contact.email}</span>
+                            {contact.phone && <span><strong className="text-slate-300">Phone:</strong> {contact.phone}</span>}
+                          </div>
+                          <p className="text-xs text-slate-300 bg-neutral-950 p-3 rounded-lg border border-neutral-800 whitespace-pre-wrap">
+                            {contact.message}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* MySQL Database Configuration & Management */}
+              {adminTab === "database" && (
+                <div className="bg-neutral-950 p-6 rounded-2xl border border-neutral-800 space-y-6">
+                  <div>
+                    <h4 className="text-lg font-bold text-white flex items-center">
+                      <Database className="w-5 h-5 text-red-500 mr-2" />
+                      MySQL Database Configuration & Status
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Persistent relational database connection parameters and synchronization controls.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-neutral-900 p-4 rounded-xl border border-neutral-800 space-y-1">
+                      <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Host</span>
+                      <p className="text-sm text-white font-mono font-semibold">localhost</p>
+                      <span className="text-[10px] text-slate-500 block">cPanel internal socket</span>
+                    </div>
+
+                    <div className="bg-neutral-900 p-4 rounded-xl border border-neutral-800 space-y-1">
+                      <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Database</span>
+                      <p className="text-sm text-emerald-400 font-mono font-bold">hampcoinc_carrie</p>
+                      <span className="text-[10px] text-slate-500 block">UTF8MB4 Unicode</span>
+                    </div>
+
+                    <div className="bg-neutral-900 p-4 rounded-xl border border-neutral-800 space-y-1">
+                      <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">User</span>
+                      <p className="text-sm text-white font-mono font-semibold">hampcoinc_keisha</p>
+                      <span className="text-[10px] text-slate-500 block">Full schema privileges</span>
+                    </div>
+
+                    <div className="bg-neutral-900 p-4 rounded-xl border border-neutral-800 space-y-1">
+                      <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Live Status</span>
+                      <p className="text-xs text-amber-400 font-medium truncate" title={dbStatus}>{dbStatus}</p>
+                      <span className="text-[10px] text-slate-500 block">Status monitor</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-neutral-900 p-5 rounded-xl border border-neutral-800 space-y-4">
+                    <h5 className="text-xs font-bold text-white uppercase tracking-wider">Database Operations</h5>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={testDbConnection}
+                        className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2.5 rounded text-xs transition-all shadow-md"
+                      >
+                        Test Database Connection
+                      </button>
+                      <button
+                        type="button"
+                        onClick={syncAllToDatabase}
+                        className="bg-neutral-800 hover:bg-neutral-700 text-slate-300 hover:text-white border border-neutral-700 font-bold px-4 py-2.5 rounded text-xs transition-all"
+                      >
+                        Push All Current Data to MySQL
+                      </button>
+                    </div>
+
+                    {testDbResult && (
+                      <div className="p-3.5 rounded-lg bg-neutral-950 border border-neutral-800 text-xs text-slate-300 font-mono whitespace-pre-wrap leading-relaxed">
+                        {testDbResult}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-neutral-900/50 border border-neutral-800 text-xs text-slate-400 space-y-2">
+                    <p className="font-semibold text-slate-300">Managed MySQL Tables:</p>
+                    <ul className="list-disc list-inside space-y-1 text-[11px] text-slate-400 font-mono">
+                      <li><strong className="text-slate-200">hampco_site_data</strong>: JSON key-value persistence for popup, events, galleries, and site text.</li>
+                      <li><strong className="text-slate-200">hampco_contacts</strong>: Records incoming inquiries from the community contact form.</li>
+                    </ul>
                   </div>
                 </div>
               )}
