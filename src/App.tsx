@@ -863,6 +863,24 @@ export default function App() {
   };
 
   // CMS Filtered datasets
+  // Featured event: the next upcoming event, shown in the hero card
+  const [highlightEventId, setHighlightEventId] = useState<string>("");
+  const featuredEvent: any = [...events]
+    .filter((evt: any) => parseLocalDate(evt.endDate || evt.date).setHours(23,59,59,999) >= Date.now())
+    .sort((a: any, b: any) => parseLocalDate(a.date).getTime() - parseLocalDate(b.date).getTime())[0];
+
+  const goToEvent = (id: string) => {
+    setActiveTab("events");
+    const el = document.getElementById(`event-${id}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      document.getElementById('events')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    setHighlightEventId(id);
+    setTimeout(() => setHighlightEventId(""), 3000);
+  };
+
   const filteredEvents = events.filter((evt: any) => {
     const q = eventSearchQuery.toLowerCase();
     const matchesSearch = !eventSearchQuery || 
@@ -1159,23 +1177,47 @@ export default function App() {
                   </p>
                 </div>
 
-                <div className="bg-neutral-900 p-4 rounded-xl border border-neutral-800 flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></div>
-                    <div>
-                      <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Latest Alert</p>
-                      <p className="text-xs text-white font-bold truncate max-w-[150px] sm:max-w-[200px]">
-                        {popup.title}
-                      </p>
+                {featuredEvent ? (
+                  <div className="bg-neutral-900 p-4 rounded-xl border border-neutral-800 flex items-center justify-between gap-3">
+                    <div className="flex items-center space-x-3 min-w-0">
+                      <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shrink-0"></div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Featured Event</p>
+                        <p className="text-sm text-white font-bold leading-snug line-clamp-2">
+                          {featuredEvent.title}
+                        </p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          {parseLocalDate(featuredEvent.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          {featuredEvent.time && featuredEvent.time !== "TBA" ? ` \u00B7 ${featuredEvent.time}` : ""}
+                        </p>
+                      </div>
                     </div>
+                    <button
+                      onClick={() => goToEvent(featuredEvent.id)}
+                      className="text-red-400 text-xs font-bold hover:underline shrink-0 py-2 pl-2"
+                    >
+                      View Event &rarr;
+                    </button>
                   </div>
-                  <button 
-                    onClick={() => setShowPopup(true)}
-                    className="text-red-400 text-xs font-bold hover:underline shrink-0"
-                  >
-                    Details &rarr;
-                  </button>
-                </div>
+                ) : popup.enabled ? (
+                  <div className="bg-neutral-900 p-4 rounded-xl border border-neutral-800 flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></div>
+                      <div>
+                        <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Latest Alert</p>
+                        <p className="text-xs text-white font-bold truncate max-w-[150px] sm:max-w-[200px]">
+                          {popup.title}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShowPopup(true)}
+                      className="text-red-400 text-xs font-bold hover:underline shrink-0"
+                    >
+                      Details &rarr;
+                    </button>
+                  </div>
+                ) : null}
 
               </div>
             </div>
@@ -1569,7 +1611,8 @@ export default function App() {
                 .map((evt: any, idx: number) => (
                 <div
                   key={evt.id}
-                  className={`reveal bg-slate-50 hover:bg-red-50/10 border border-slate-200 hover:border-red-200 rounded-2xl p-6 sm:p-8 transition-all flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 delay-${Math.min(idx * 100, 500)}`}
+                  id={`event-${evt.id}`}
+                  className={`reveal bg-slate-50 hover:bg-red-50/10 border rounded-2xl p-6 sm:p-8 transition-all flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 delay-${Math.min(idx * 100, 500)} ${highlightEventId === evt.id ? "border-red-500 ring-4 ring-red-200" : "border-slate-200 hover:border-red-200"}`}
                 >
                   <div className="flex items-start space-x-5 lg:col-span-8">
                     {/* Date badge matching branding */}
